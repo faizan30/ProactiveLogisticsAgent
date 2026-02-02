@@ -1,0 +1,377 @@
+{
+  "East_East_Flight": {
+    "avg_transit_days": 5.3,
+    "failure_rate": 0.33,
+    "sample_size": 52
+  },
+  "East_East_Road": {
+    "avg_transit_days": 5.4,
+    "failure_rate": 0.46,
+    "sample_size": 56
+  },
+  "East_East_Ship": {
+    "avg_transit_days": 7.3,
+    "failure_rate": 0.37,
+    "sample_size": 232
+  },
+  "East_Midwest_Flight": {
+    "avg_transit_days": 5.7,
+    "failure_rate": 0.4,
+    "sample_size": 53
+  },
+  "East_Midwest_Road": {
+    "avg_transit_days": 8.7,
+    "failure_rate": 0.37,
+    "sample_size": 51
+  },
+  "East_Midwest_Ship": {
+    "avg_transit_days": 9.9,
+    "failure_rate": 0.44,
+    "sample_size": 243
+  },
+  "East_North_Flight": {
+    "avg_transit_days": 4.9,
+    "failure_rate": 0.36,
+    "sample_size": 61
+  },
+  "East_North_Road": {
+    "avg_transit_days": 7.7,
+    "failure_rate": 0.51,
+    "sample_size": 63
+  },
+  "East_North_Ship": {
+    "avg_transit_days": 10.0,
+    "failure_rate": 0.41,
+    "sample_size": 222
+  },
+  "East_South_Flight": {
+    "avg_transit_days": 5.1,
+    "failure_rate": 0.45,
+    "sample_size": 66
+  },
+  "East_South_Road": {
+    "avg_transit_days": 8.0,
+    "failure_rate": 0.35,
+    "sample_size": 62
+  },
+  "East_South_Ship": {
+    "avg_transit_days": 10.0,
+    "failure_rate": 0.41,
+    "sample_size": 258
+  },
+  "East_West_Flight": {
+    "avg_transit_days": 5.7,
+    "failure_rate": 0.33,
+    "sample_size": 63
+  },
+  "East_West_Road": {
+    "avg_transit_days": 8.5,
+    "failure_rate": 0.42,
+    "sample_size": 62
+  },
+  "East_West_Ship": {
+    "avg_transit_days": 10.2,
+    "failure_rate": 0.39,
+    "sample_size": 289
+  },
+  "Midwest_East_Flight": {
+    "avg_transit_days": 5.7,
+    "failure_rate": 0.35,
+    "sample_size": 112
+  },
+  "Midwest_East_Road": {
+    "avg_transit_days": 8.8,
+    "failure_rate": 0.35,
+    "sample_size": 107
+  },
+  "Midwest_East_Ship": {
+    "avg_transit_days": 10.2,
+    "failure_rate": 0.4,
+    "sample_size": 507
+  },
+  "Midwest_Midwest_Flight": {
+    "avg_transit_days": 4.3,
+    "failure_rate": 0.41,
+    "sample_size": 111
+  },
+  "Midwest_Midwest_Road": {
+    "avg_transit_days": 4.9,
+    "failure_rate": 0.42,
+    "sample_size": 115
+  },
+  "Midwest_Midwest_Ship": {
+    "avg_transit_days": 7.4,
+    "failure_rate": 0.41,
+    "sample_size": 518
+  },
+  "Midwest_North_Flight": {
+    "avg_transit_days": 5.3,
+    "failure_rate": 0.34,
+    "sample_size": 118
+  },
+  "Midwest_North_Road": {
+    "avg_transit_days": 9.0,
+    "failure_rate": 0.35,
+    "sample_size": 131
+  },
+  "Midwest_North_Ship": {
+    "avg_transit_days": 10.0,
+    "failure_rate": 0.42,
+    "sample_size": 499
+  },
+  "Midwest_South_Flight": {
+    "avg_transit_days": 5.2,
+    "failure_rate": 0.47,
+    "sample_size": 128
+  },
+  "Midwest_South_Road": {
+    "avg_transit_days": 7.8,
+    "failure_rate": 0.5,
+    "sample_size": 122
+  },
+  "Midwest_South_Ship": {
+    "avg_transit_days": 10.1,
+    "failure_rate": 0.4,
+    "sample_size": 488
+  },
+  "Midwest_West_Flight": {
+    "avg_transit_days": 5.0,
+    "failure_rate": 0.42,
+    "sample_size": 123
+  },
+  "Midwest_West_Road": {
+    "avg_transit_days": 8.1,
+    "failure_rate": 0.38,
+    "sample_size": 111
+  },
+  "Midwest_West_Ship": {
+    "avg_transit_days": 10.6,
+    "failure_rate": 0.38,
+    "sample_size": 476
+  },
+  "North_East_Flight": {
+    "avg_transit_days": 5.3,
+    "failure_rate": 0.42,
+    "sample_size": 62
+  },
+  "North_East_Road": {
+    "avg_transit_days": 7.8,
+    "failure_rate": 0.42,
+    "sample_size": 50
+  },
+  "North_East_Ship": {
+    "avg_transit_days": 10.0,
+    "failure_rate": 0.43,
+    "sample_size": 258
+  },
+  "North_Midwest_Flight": {
+    "avg_transit_days": 5.3,
+    "failure_rate": 0.45,
+    "sample_size": 47
+  },
+  "North_Midwest_Road": {
+    "avg_transit_days": 8.7,
+    "failure_rate": 0.38,
+    "sample_size": 61
+  },
+  "North_Midwest_Ship": {
+    "avg_transit_days": 9.9,
+    "failure_rate": 0.43,
+    "sample_size": 239
+  },
+  "North_North_Flight": {
+    "avg_transit_days": 4.0,
+    "failure_rate": 0.47,
+    "sample_size": 72
+  },
+  "North_North_Road": {
+    "avg_transit_days": 5.2,
+    "failure_rate": 0.48,
+    "sample_size": 58
+  },
+  "North_North_Ship": {
+    "avg_transit_days": 7.1,
+    "failure_rate": 0.44,
+    "sample_size": 254
+  },
+  "North_South_Flight": {
+    "avg_transit_days": 5.5,
+    "failure_rate": 0.36,
+    "sample_size": 61
+  },
+  "North_South_Road": {
+    "avg_transit_days": 8.3,
+    "failure_rate": 0.39,
+    "sample_size": 61
+  },
+  "North_South_Ship": {
+    "avg_transit_days": 10.3,
+    "failure_rate": 0.37,
+    "sample_size": 260
+  },
+  "North_West_Flight": {
+    "avg_transit_days": 5.4,
+    "failure_rate": 0.36,
+    "sample_size": 55
+  },
+  "North_West_Road": {
+    "avg_transit_days": 7.5,
+    "failure_rate": 0.47,
+    "sample_size": 64
+  },
+  "North_West_Ship": {
+    "avg_transit_days": 10.5,
+    "failure_rate": 0.38,
+    "sample_size": 231
+  },
+  "South_East_Flight": {
+    "avg_transit_days": 5.1,
+    "failure_rate": 0.44,
+    "sample_size": 55
+  },
+  "South_East_Road": {
+    "avg_transit_days": 8.4,
+    "failure_rate": 0.42,
+    "sample_size": 65
+  },
+  "South_East_Ship": {
+    "avg_transit_days": 9.9,
+    "failure_rate": 0.44,
+    "sample_size": 223
+  },
+  "South_Midwest_Flight": {
+    "avg_transit_days": 6.2,
+    "failure_rate": 0.29,
+    "sample_size": 58
+  },
+  "South_Midwest_Road": {
+    "avg_transit_days": 8.5,
+    "failure_rate": 0.39,
+    "sample_size": 66
+  },
+  "South_Midwest_Ship": {
+    "avg_transit_days": 10.4,
+    "failure_rate": 0.39,
+    "sample_size": 294
+  },
+  "South_North_Flight": {
+    "avg_transit_days": 4.5,
+    "failure_rate": 0.48,
+    "sample_size": 60
+  },
+  "South_North_Road": {
+    "avg_transit_days": 8.1,
+    "failure_rate": 0.47,
+    "sample_size": 62
+  },
+  "South_North_Ship": {
+    "avg_transit_days": 10.5,
+    "failure_rate": 0.39,
+    "sample_size": 253
+  },
+  "South_South_Flight": {
+    "avg_transit_days": 3.8,
+    "failure_rate": 0.45,
+    "sample_size": 64
+  },
+  "South_South_Road": {
+    "avg_transit_days": 6.0,
+    "failure_rate": 0.33,
+    "sample_size": 57
+  },
+  "South_South_Ship": {
+    "avg_transit_days": 7.4,
+    "failure_rate": 0.37,
+    "sample_size": 244
+  },
+  "South_West_Flight": {
+    "avg_transit_days": 5.7,
+    "failure_rate": 0.34,
+    "sample_size": 59
+  },
+  "South_West_Road": {
+    "avg_transit_days": 7.9,
+    "failure_rate": 0.48,
+    "sample_size": 44
+  },
+  "South_West_Ship": {
+    "avg_transit_days": 10.3,
+    "failure_rate": 0.38,
+    "sample_size": 229
+  },
+  "West_East_Flight": {
+    "avg_transit_days": 5.1,
+    "failure_rate": 0.46,
+    "sample_size": 50
+  },
+  "West_East_Road": {
+    "avg_transit_days": 8.4,
+    "failure_rate": 0.41,
+    "sample_size": 54
+  },
+  "West_East_Ship": {
+    "avg_transit_days": 10.2,
+    "failure_rate": 0.4,
+    "sample_size": 262
+  },
+  "West_Midwest_Flight": {
+    "avg_transit_days": 4.9,
+    "failure_rate": 0.37,
+    "sample_size": 73
+  },
+  "West_Midwest_Road": {
+    "avg_transit_days": 8.0,
+    "failure_rate": 0.39,
+    "sample_size": 62
+  },
+  "West_Midwest_Ship": {
+    "avg_transit_days": 10.4,
+    "failure_rate": 0.35,
+    "sample_size": 247
+  },
+  "West_North_Flight": {
+    "avg_transit_days": 5.5,
+    "failure_rate": 0.4,
+    "sample_size": 62
+  },
+  "West_North_Road": {
+    "avg_transit_days": 8.6,
+    "failure_rate": 0.39,
+    "sample_size": 64
+  },
+  "West_North_Ship": {
+    "avg_transit_days": 10.2,
+    "failure_rate": 0.41,
+    "sample_size": 244
+  },
+  "West_South_Flight": {
+    "avg_transit_days": 4.9,
+    "failure_rate": 0.48,
+    "sample_size": 61
+  },
+  "West_South_Road": {
+    "avg_transit_days": 8.4,
+    "failure_rate": 0.48,
+    "sample_size": 48
+  },
+  "West_South_Ship": {
+    "avg_transit_days": 9.9,
+    "failure_rate": 0.44,
+    "sample_size": 234
+  },
+  "West_West_Flight": {
+    "avg_transit_days": 5.0,
+    "failure_rate": 0.29,
+    "sample_size": 51
+  },
+  "West_West_Road": {
+    "avg_transit_days": 5.6,
+    "failure_rate": 0.38,
+    "sample_size": 64
+  },
+  "West_West_Ship": {
+    "avg_transit_days": 7.4,
+    "failure_rate": 0.42,
+    "sample_size": 258
+  }
+}
