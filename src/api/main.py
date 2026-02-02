@@ -144,19 +144,63 @@ def detect_deviation(order_id: int = Path(ge=1)):
 
 @app.post("/trigger-agent/{order_id}", tags=["demo"])
 def trigger_agent(order_id: int = Path(ge=1)):
-    """Step 5: Trigger agent resolution (placeholder - will implement next)."""
+    """Step 5: Trigger multi-agent resolution system.
+    
+    Uses LangGraph supervisor to orchestrate specialist agents:
+    - OperationsAgent: Hub inquiries
+    - CustomerAgent: Customer communication
+    - ResolutionAgent: Refunds, reschedules
+    
+    Logged to Langfuse for observability.
+    """
+    from src.agent import run_supervisor
+    
     order = app_state.db.get_order(order_id)
     if not order:
         raise HTTPException(status_code=404, detail=f"Order {order_id} not found")
     
     signal = app_state.risk_engine.detect(order)
     
-    # Placeholder response - agent will be implemented next
+    # No action needed for ON_TRACK
+    if signal.signal_type.value == "ON_TRACK":
+        return {
+            "order_id": order_id,
+            "status": "no_action",
+            "signal_type": signal.signal_type.value,
+            "message": "Shipment on track, no intervention needed",
+        }
+    
+    # Run multi-agent supervisor
+    result = run_supervisor(
+        order=order,
+        signal_type=signal.signal_type.value,
+        signal_reason=signal.reason,
+        use_checkpointer=True,
+    )
+    
+    # Store conversation in DB
+    if result.get("conversation_turns"):
+        conv_id = app_state.db.create_conversation(order_id, signal.signal_type.value)
+        for turn in result["conversation_turns"]:
+            app_state.db.add_turn(
+                conv_id,
+                role=turn.get("role", "agent"),
+                message=turn.get("message", ""),
+                action=turn.get("action"),
+            )
+        app_state.db.update_conversation_status(
+            conv_id,
+            status=result.get("status", "resolved"),
+            resolution=result.get("resolution"),
+        )
+    
     return {
         "order_id": order_id,
-        "status": "no_risk" if signal.signal_type.value == "ON_TRACK" else "pending_agent",
+        "status": result.get("status", "resolved"),
         "signal_type": signal.signal_type.value,
-        "message": "Agent not yet implemented" if signal.signal_type.value != "ON_TRACK" else "No action needed",
+        "resolution": result.get("resolution"),
+        "actions_taken": result.get("actions_taken", []),
+        "conversation_turns": len(result.get("conversation_turns", [])),
     }
 
 

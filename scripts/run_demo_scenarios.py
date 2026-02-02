@@ -168,8 +168,9 @@ def run_scenario(order_id: int, skip_agent: bool = False) -> dict:
         result["success"] = True
         return result
     
-    # Step 5: Trigger Agent
+    # Step 5: Trigger Agent (Real LLM calls)
     print("\n5️⃣  TRIGGER AGENT (POST /trigger-agent/{id})")
+    print("   🤖 Running multi-agent system (this may take 10-30s)...")
     start = time.time()
     agent_result = trigger_agent(order_id)
     elapsed = time.time() - start
@@ -180,26 +181,62 @@ def run_scenario(order_id: int, skip_agent: bool = False) -> dict:
         return result
     
     status = agent_result.get("status", "unknown")
-    message = agent_result.get("message", "")
-    print(f"   ✓ Status: {status} ({elapsed:.1f}s)")
-    if message:
-        print(f"   📝 {message}")
+    resolution = agent_result.get("resolution")
+    actions_taken = agent_result.get("actions_taken", [])
+    conv_turns = agent_result.get("conversation_turns", 0)
     
-    # Step 6: View Response
+    print(f"   ✓ Status: {status} ({elapsed:.1f}s)")
+    
+    if resolution:
+        print(f"   📋 Resolution: {resolution[:100]}{'...' if len(str(resolution)) > 100 else ''}")
+    
+    if actions_taken:
+        print(f"   � Actions Taken ({len(actions_taken)}):")
+        for i, action in enumerate(actions_taken[:5], 1):
+            action_str = str(action)[:60]
+            print(f"      {i}. {action_str}{'...' if len(str(action)) > 60 else ''}")
+        if len(actions_taken) > 5:
+            print(f"      ... and {len(actions_taken) - 5} more")
+    
+    if conv_turns:
+        print(f"   💬 Conversation turns: {conv_turns}")
+    
+    # Step 6: View Response (from DB)
     print("\n6️⃣  VIEW RESPONSE (GET /view-response/{id})")
     response = get_response(order_id)
     if "error" not in response:
         conversation = response.get("conversation")
         if conversation:
             turns = conversation.get("turns", [])
-            print(f"   ✓ Conversation: {len(turns)} turn(s)")
-            for t in turns[:5]:
-                print(f"      [{t.get('role')}] {t.get('message', '')[:50]}...")
+            conv_status = conversation.get("status", "unknown")
+            conv_resolution = conversation.get("resolution")
+            
+            print(f"   ✓ Stored conversation: {len(turns)} turn(s), status={conv_status}")
+            
+            if conv_resolution:
+                print(f"   📋 DB Resolution: {conv_resolution[:80]}...")
+            
+            if turns:
+                print("   📝 Conversation log:")
+                for t in turns[:6]:
+                    role = t.get('role', 'unknown')
+                    msg = t.get('message', '')[:50]
+                    action = t.get('action', '')
+                    if action:
+                        print(f"      [{role}] ({action}) {msg}...")
+                    else:
+                        print(f"      [{role}] {msg}...")
+                if len(turns) > 6:
+                    print(f"      ... and {len(turns) - 6} more turns")
         else:
-            print("   (No conversation yet)")
+            print("   (No conversation stored yet)")
+    else:
+        print(f"   ℹ️  {response.get('error', 'No response available')}")
     
     result["status"] = status
-    result["success"] = status in ["resolved", "no_risk", "pending_agent"]
+    result["resolution"] = resolution
+    result["actions_taken"] = actions_taken
+    result["success"] = status in ["resolved", "no_action", "no_risk"]
     result["execution_time"] = elapsed
     
     return result

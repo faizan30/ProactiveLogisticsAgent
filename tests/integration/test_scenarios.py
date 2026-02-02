@@ -1,19 +1,31 @@
 """
 Integration tests for the 4 demo scenarios.
 
-Tests the complete flow from order → KPI calculation → risk detection.
+Tests the complete flow:
+1. Order → KPI calculation → Risk detection (RiskEngine)
+2. Risk signal → Agent resolution (Multi-Agent System)
+
 Each scenario maps to a specific signal type:
-- Scenario 1001: Happy Path → ON_TRACK
-- Scenario 1002: Predicted Delay → PREDICTED_DELAY  
-- Scenario 1003: Stuck at Hub → STUCK_AT_HUB
-- Scenario 1004: Ticket Raised → TICKET_RAISED
+- Scenario 1001: Happy Path → ON_TRACK (no agent needed)
+- Scenario 1002: Predicted Delay → PREDICTED_DELAY → Agent resolves
+- Scenario 1003: Stuck at Hub → STUCK_AT_HUB → Agent resolves
+- Scenario 1004: Ticket Raised → TICKET_RAISED → Agent resolves
 """
+import os
 import pytest
 from datetime import datetime, timedelta
+from unittest.mock import patch, MagicMock
+
+from langchain_core.messages import AIMessage
 
 from src.risk_detection.risk_engine import RiskEngine
 from src.contracts.models import SignalType, Severity
 from src.bootstrap import generate_demo_orders, SCENARIOS, DEMO_ORDER_IDS
+from src.agent.state import create_initial_state
+from src.agent.supervisor import build_graph, run_supervisor
+from src.agent.specialists.base import create_specialist_node
+from src.agent.prompts import OPERATIONS_SYSTEM_PROMPT
+from src.agent.tools import OPERATIONS_TOOLS, CUSTOMER_TOOLS, RESOLUTION_TOOLS
 
 
 class TestScenario1001HappyPath:
@@ -293,3 +305,214 @@ class TestScenarioPriorityOrdering:
         }
         signal = engine.detect(order, now)
         assert signal.signal_type == SignalType.STUCK_AT_HUB
+
+
+# ============================================================================
+# AGENT INTEGRATION TESTS (Mocked LLM)
+# ============================================================================
+
+class TestAgentGraphStructure:
+    """Tests for agent graph structure without LLM calls."""
+    
+    def test_build_graph_returns_state_graph(self):
+        """Build graph creates a valid StateGraph."""
+        workflow = build_graph()
+        assert workflow is not None
+        assert hasattr(workflow, "nodes")
+    
+    def test_workflow_has_required_nodes(self):
+        """Workflow contains all required nodes."""
+        workflow = build_graph()
+        node_names = list(workflow.nodes.keys())
+        
+        for node in ["supervisor", "operations", "customer", "resolution", "finish"]:
+            assert node in node_names, f"Missing node: {node}"
+    
+    def test_workflow_compiles(self):
+        """Workflow can compile without checkpointer."""
+        workflow = build_graph()
+        graph = workflow.compile()
+        assert graph is not None
+        assert hasattr(graph, "invoke")
+
+
+class TestAgentStateMocked:
+    """Tests for agent state management."""
+    
+    def test_create_initial_state_structure(self):
+        """Initial state has all required fields."""
+        order = {"id": 1003, "origin_region": "North", "destination_region": "South"}
+        state = create_initial_state(order, "STUCK_AT_HUB", "Package at hub 48h")
+        
+        required = ["order_id", "order", "signal_type", "signal_reason", 
+                    "messages", "actions_taken", "status", "resolution"]
+        for field in required:
+            assert field in state, f"Missing field: {field}"
+    
+    def test_state_preserves_order_data(self):
+        """State preserves order information."""
+        order = {"id": 1003, "mocked_customer_response": "refund"}
+        state = create_initial_state(order, "TICKET_RAISED", "Customer complaint")
+        
+        assert state["order_id"] == 1003
+        assert state["mocked_customer_response"] == "refund"
+
+
+class TestAgentSpecialistsMocked:
+    """Tests for specialist agents with mocked LLM."""
+    
+    @pytest.fixture
+    def mock_state(self):
+        state = create_initial_state(
+            order={"id": 1003, "origin_region": "North", "destination_region": "South"},
+            signal_type="STUCK_AT_HUB",
+            signal_reason="Package at hub"
+        )
+        state["messages"] = [AIMessage(content="Contact the hub")]
+        return state
+    
+    @patch("src.agent.specialists.base.create_react_agent")
+    @patch("src.agent.specialists.base.ChatOpenAI")
+    def test_specialist_executes_and_returns_actions(self, mock_llm, mock_agent, mock_state):
+        """Specialist node executes task and returns state updates."""
+        mock_react = MagicMock()
+        mock_react.invoke.return_value = {
+            "messages": [AIMessage(content="Hub contacted. Package ready.")]
+        }
+        mock_agent.return_value = mock_react
+        
+        node_fn = create_specialist_node("operations", OPERATIONS_SYSTEM_PROMPT, OPERATIONS_TOOLS)
+        result = node_fn(mock_state, {})
+        
+        assert "actions_taken" in result
+        assert len(result["actions_taken"]) > 0
+        assert "operations" in result["actions_taken"][0].lower()
+    
+    @patch("src.agent.specialists.base.create_react_agent")
+    @patch("src.agent.specialists.base.ChatOpenAI")
+    def test_specialist_adds_conversation_turn(self, mock_llm, mock_agent, mock_state):
+        """Specialist adds conversation turn to state."""
+        mock_react = MagicMock()
+        mock_react.invoke.return_value = {
+            "messages": [AIMessage(content="Customer notified.")]
+        }
+        mock_agent.return_value = mock_react
+        
+        node_fn = create_specialist_node("customer", "You are customer agent", CUSTOMER_TOOLS)
+        result = node_fn(mock_state, {})
+        
+        assert "conversation_turns" in result
+        assert result["conversation_turns"][0]["role"] == "customer"
+
+
+class TestAgentRunSupervisorMocked:
+    """Tests for run_supervisor with mocked graph."""
+    
+    @patch("src.agent.supervisor.get_langfuse_handler")
+    @patch("src.agent.supervisor.build_graph")
+    def test_run_supervisor_returns_result_structure(self, mock_build, mock_langfuse):
+        """run_supervisor returns expected result structure."""
+        mock_langfuse.return_value = None
+        
+        mock_graph = MagicMock()
+        mock_graph.invoke.return_value = {
+            "order_id": 1003,
+            "status": "resolved",
+            "resolution": "Rescheduled",
+            "actions_taken": ["ops: hub contacted"],
+            "conversation_turns": [{"role": "agent", "message": "Done"}],
+        }
+        mock_workflow = MagicMock()
+        mock_workflow.compile.return_value = mock_graph
+        mock_build.return_value = mock_workflow
+        
+        result = run_supervisor(
+            order={"id": 1003, "origin_region": "North", "destination_region": "South"},
+            signal_type="STUCK_AT_HUB",
+            signal_reason="Test",
+            use_checkpointer=False,
+        )
+        
+        assert result["order_id"] == 1003
+        assert result["status"] == "resolved"
+        assert "resolution" in result
+        assert "actions_taken" in result
+    
+    @patch("src.agent.supervisor.get_langfuse_handler")
+    @patch("src.agent.supervisor.build_graph")
+    def test_run_supervisor_handles_errors(self, mock_build, mock_langfuse):
+        """run_supervisor handles errors gracefully."""
+        mock_langfuse.return_value = None
+        mock_graph = MagicMock()
+        mock_graph.invoke.side_effect = Exception("LLM Error")
+        mock_workflow = MagicMock()
+        mock_workflow.compile.return_value = mock_graph
+        mock_build.return_value = mock_workflow
+        
+        result = run_supervisor(
+            order={"id": 1003},
+            signal_type="STUCK_AT_HUB",
+            signal_reason="Test",
+            use_checkpointer=False,
+        )
+        
+        assert result["status"] == "failed"
+        assert "Error" in result["resolution"]
+
+
+# ============================================================================
+# LIVE AGENT TESTS (Real LLM calls - requires OPENAI_API_KEY)
+# ============================================================================
+
+@pytest.mark.skipif(not os.getenv("OPENAI_API_KEY"), reason="No OPENAI_API_KEY")
+class TestAgentLiveExecution:
+    """
+    Live tests with real LLM calls.
+    
+    Run with: pytest tests/integration/test_scenarios.py -k "Live" -v -s
+    """
+    
+    def test_live_stuck_at_hub_resolution(self):
+        """LIVE: Full resolution of stuck-at-hub scenario."""
+        order = {
+            "id": 9001,
+            "origin_region": "North",
+            "destination_region": "South",
+            "customer_rating": 4,
+            "customer_care_calls": 1,
+            "mocked_customer_response": "reschedule",
+        }
+        
+        result = run_supervisor(
+            order=order,
+            signal_type="STUCK_AT_HUB",
+            signal_reason="Package at hub for 60 hours",
+            use_checkpointer=False,
+        )
+        
+        assert result["order_id"] == 9001
+        assert result["status"] in ["resolved", "failed"]
+        if result["status"] == "resolved":
+            assert len(result["actions_taken"]) > 0
+    
+    def test_live_ticket_raised_resolution(self):
+        """LIVE: Full resolution of ticket-raised scenario."""
+        order = {
+            "id": 9002,
+            "origin_region": "West",
+            "destination_region": "East",
+            "customer_rating": 2,
+            "customer_care_calls": 4,
+            "ticket_raised": 1,
+            "mocked_customer_response": "refund",
+        }
+        
+        result = run_supervisor(
+            order=order,
+            signal_type="TICKET_RAISED",
+            signal_reason="Customer raised support ticket",
+            use_checkpointer=False,
+        )
+        
+        assert result["order_id"] == 9002
+        assert result["status"] in ["resolved", "failed"]

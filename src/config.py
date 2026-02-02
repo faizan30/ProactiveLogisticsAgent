@@ -89,7 +89,15 @@ KPI_CONFIG = {
 # ==================== AGENT CONFIG ====================
 
 AGENT_CONFIG = {
-    "model": "gpt-4o",
-    "max_turns": 5,               # Max conversation turns per scenario
-    "max_refund_percent": 20,     # Max refund without escalation (%)
+    # Model configuration - easily swappable
+    "supervisor_model": os.getenv("AGENT_SUPERVISOR_MODEL", "gpt-5.2"),
+    "specialist_model": os.getenv("AGENT_SPECIALIST_MODEL", "gpt-5.1"),
+    
+    # Temperature settings
+    "supervisor_temperature": float(os.getenv("AGENT_SUPERVISOR_TEMP", "0.0")),
+    "specialist_temperature": float(os.getenv("AGENT_SPECIALIST_TEMP", "0.0")),
+    
+    # Operational limits
+    "max_turns": int(os.getenv("AGENT_MAX_TURNS", "10")),
+    "max_refund_percent": float(os.getenv("AGENT_MAX_REFUND_PERCENT", "20")),
 }
