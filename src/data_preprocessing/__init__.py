@@ -1,8 +1,10 @@
 """
 Data Preprocessing Module
 
-Contains:
-- enrichment_prompts.md: Gemini Pro prompts used for synthetic data generation
-- route_stats_generator.py: Standalone script to generate route statistics
-- README.md: Documentation for offline vs online transformations
+Offline data preparation scripts:
+- route_stats_generator.py: Generate route_stats.json from enriched CSV
+- enrichment_prompts.md: Gemini Pro prompts for synthetic data
+- validate_enrichment.ipynb: Data quality validation
+
+RiskEngine loads route_stats.json at startup for dynamic KPI thresholds.
 """

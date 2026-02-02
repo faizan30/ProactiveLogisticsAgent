@@ -1,14 +1,10 @@
 """
 Route Statistics Generator
 
-Standalone script to generate route performance statistics from enriched CSV.
-Output: data/route_stats.json
+Generates route_stats.json from enriched CSV for use by RiskEngine.
 
 Usage:
     python -m src.data_preprocessing.route_stats_generator [--update]
-    
-Options:
-    --update    Force recompute even if route_stats.json exists
 """
 import argparse
 import json
@@ -21,95 +17,68 @@ DEFAULT_CSV_PATH = Path(__file__).resolve().parents[2] / "data" / "Celonis_Garag
 DEFAULT_JSON_PATH = Path(__file__).resolve().parents[2] / "data" / "route_stats.json"
 
 
-def generate_route_stats(df: pd.DataFrame) -> Dict:
+def generate_route_stats(csv_path: Path) -> Dict:
     """
-    Generate route performance statistics from enriched dataset.
+    Generate route stats from enriched CSV.
     
-    Groups by (Origin_Region, Destination_Region, Mode_of_Shipment) and calculates:
-    - failure_rate: 1 - on_time_rate
-    - avg_transit_days: mean transit time for delivered orders
-    - sample_size: number of orders in route
-    
-    Args:
-        df: DataFrame with enriched order data
-        
-    Returns:
-        Dict with route keys (origin_dest_mode) -> stats
+    Route key: "{origin}_{destination}_{mode}"
+    Returns: {route_key: {failure_rate, avg_transit_days, sample_size}}
     """
-    stats = {}
+    df = pd.read_csv(csv_path)
     
-    # Ensure date columns are datetime
+    # Convert dates
     for col in ['Ship_Date', 'Actual_Delivery_Date']:
         if col in df.columns:
             df[col] = pd.to_datetime(df[col], errors='coerce')
     
-    # Group by route
+    stats = {}
     groups = df.groupby(['Origin_Region', 'Destination_Region', 'Mode_of_Shipment'])
     
     for (origin, dest, mode), group in groups:
         key = f"{origin}_{dest}_{mode}"
         
-        # Calculate failure rate from on-time flag
+        # Failure rate from on-time flag
         if 'Reached.on.Time_Y.N' in group.columns:
-            on_time_rate = group['Reached.on.Time_Y.N'].mean()
-            failure_rate = 1.0 - float(on_time_rate)
+            failure_rate = 1.0 - group['Reached.on.Time_Y.N'].mean()
         else:
             failure_rate = 0.0
         
-        # Calculate average transit days for delivered orders
+        # Average transit days
         delivered = group[
             pd.notna(group['Actual_Delivery_Date']) & 
             pd.notna(group['Ship_Date'])
         ]
         if not delivered.empty:
-            avg_transit = (
-                delivered['Actual_Delivery_Date'] - delivered['Ship_Date']
-            ).dt.days.mean()
+            avg_transit = (delivered['Actual_Delivery_Date'] - delivered['Ship_Date']).dt.days.mean()
         else:
-            avg_transit = 3.0  # Default
+            avg_transit = 3.0
         
         stats[key] = {
-            "failure_rate": float(round(failure_rate, 2)),
-            "avg_transit_days": float(round(avg_transit, 1)),
-            "sample_size": int(len(group))
+            "failure_rate": round(failure_rate, 2),
+            "avg_transit_days": max(round(avg_transit, 1), 0.5),  # Min 0.5 days
+            "sample_size": len(group)
         }
     
     return stats
 
 
-def save_stats(stats: Dict, json_path: Path) -> None:
-    """Save stats to JSON with atomic write."""
-    json_path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = json_path.with_suffix(".tmp")
-    with tmp_path.open("w", encoding="utf-8") as f:
-        json.dump(stats, f, indent=2, sort_keys=True)
-    tmp_path.replace(json_path)
-    print(f"Saved {len(stats)} routes to {json_path}")
-
-
 def main():
     parser = argparse.ArgumentParser(description="Generate route statistics")
     parser.add_argument("--update", action="store_true", help="Force recompute")
-    parser.add_argument("--csv", type=Path, default=DEFAULT_CSV_PATH, help="Input CSV path")
-    parser.add_argument("--output", type=Path, default=DEFAULT_JSON_PATH, help="Output JSON path")
     args = parser.parse_args()
     
-    # Check if already exists
-    if args.output.exists() and not args.update:
-        print(f"Route stats already exist at {args.output}")
-        print("Use --update to force recompute")
+    if DEFAULT_JSON_PATH.exists() and not args.update:
+        print(f"Route stats exist at {DEFAULT_JSON_PATH}")
+        print("Use --update to recompute")
         return
     
-    # Load and process
-    print(f"Loading {args.csv}...")
-    df = pd.read_csv(args.csv)
-    print(f"Loaded {len(df)} orders")
+    print(f"Generating from {DEFAULT_CSV_PATH}...")
+    stats = generate_route_stats(DEFAULT_CSV_PATH)
     
-    print("Generating route statistics...")
-    stats = generate_route_stats(df)
+    with DEFAULT_JSON_PATH.open("w") as f:
+        json.dump(stats, f, indent=2, sort_keys=True)
     
-    save_stats(stats, args.output)
-    print("Done!")
+    print(f"Saved {len(stats)} routes to {DEFAULT_JSON_PATH}")
 
 
 if __name__ == "__main__":

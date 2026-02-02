@@ -1,42 +1,52 @@
 # Data Preprocessing
 
-This module contains artifacts and scripts for dataset preparation.
+Offline scripts for dataset preparation.
 
 ## Contents
 
 | File | Purpose |
 |------|---------|
-| `enrichment_prompts.md` | Gemini Pro prompts used for synthetic data generation |
-| `route_stats_generator.py` | Standalone script to generate route performance statistics |
-| `validate_enrichment.ipynb` | Jupyter notebook to validate enriched data |
+| `route_stats_generator.py` | Generate route_stats.json from enriched CSV |
+| `enrichment_prompts.md` | Gemini Pro prompts for synthetic data |
+| `validate_enrichment.ipynb` | Data quality validation notebook |
 
-## Offline vs Online Transformations
+## How It Works
 
-| Type | When | What |
-|------|------|------|
-| **Offline** | One-time, before deployment | Enrich CSV with 15 synthetic columns using Gemini Pro |
-| **Online** | At runtime | Time-travel masking, KPI calculation, signal detection |
+```
+Enriched CSV  ──▶  route_stats_generator.py  ──▶  route_stats.json
+                                                        │
+                                                        ▼
+                                               RiskEngine loads at startup
+                                               for dynamic KPI thresholds
+```
+
+## Route Stats JSON
+
+Route key format: `"{origin}_{destination}_{mode}"`
+
+```json
+{
+  "South_Midwest_Flight": {
+    "failure_rate": 0.38,
+    "avg_transit_days": 2.1,
+    "sample_size": 145
+  }
+}
+```
+
+Used by `TransitHoursKPI` and `RouteRiskKPI` for route-specific thresholds.
 
 ## Usage
 
-### Regenerate Route Statistics
-
 ```bash
-# Check if exists (won't overwrite)
+# Generate (skips if exists)
 python -m src.data_preprocessing.route_stats_generator
 
-# Force recompute
+# Force regenerate
 python -m src.data_preprocessing.route_stats_generator --update
 ```
 
-### Re-enrich Dataset
-
-If you need to regenerate the enriched dataset:
-1. Review `enrichment_prompts.md` for the Gemini Pro prompt
-2. Run prompt against `data/Original_data.csv`
-3. Save output as `data/Celonis_Garage_Enriched_Data_Final.csv`
-
 ## See Also
 
-- `data/README.md` - Dataset documentation
-- `documentation/Architecture.md` Section 7 - Data simulation design
+- `src/risk_detection/risk_engine.py` - Loads route_stats.json at line 25-31
+- `src/risk_detection/kpis.py` - Uses route stats for dynamic thresholds

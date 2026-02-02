@@ -52,7 +52,7 @@ You are a logistics data engineer. I have an e-commerce orders dataset with the 
 
 [PASTE ORIGINAL 12 COLUMNS]
 
-I need you to enrich this dataset by adding 15 new columns for a supply chain simulation. 
+I need you to enrich this dataset by adding new columns for a supply chain simulation. 
 Follow these rules exactly:
 
 ### Timestamp Generation
@@ -100,3 +100,17 @@ After generation, verify:
 - [ ] Regions from valid set: North, South, East, West, Midwest
 - [ ] Customer_type: Consumer, Corporate, Home Office
 - [ ] Payment_Status: Paid (~78%), Refunded (~18%), COD (~4%)
+
+Use `src/data_preprocessing/validate_enrichment.ipynb` to run these checks.
+
+---
+
+## Route Stats Generation
+
+After enrichment, generate route statistics for KPI dynamic thresholds:
+
+```bash
+python -m src.data_preprocessing.route_stats_generator --update
+```
+
+This creates `data/route_stats.json` with failure rates and average transit times per route+mode combination, used by `TransitHoursKPI` and `RouteRiskKPI`.
