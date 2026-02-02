@@ -104,6 +104,58 @@ class PostgresManager:
         finally:
             session.close()
     
+    def get_orders_by_status(self, status: str) -> List[dict]:
+        """Get orders filtered by delivery status.
+        
+        Status options:
+        - pending: Not yet delivered (actual_delivery_date IS NULL)
+        - in_transit: Shipped but not at hub (ship_date NOT NULL, destination_arrival_date IS NULL)
+        - at_hub: At hub but not delivered (destination_arrival_date NOT NULL, actual_delivery_date IS NULL)
+        - delivered: Delivered (actual_delivery_date IS NOT NULL)
+        """
+        session = self.Session()
+        try:
+            query = session.query(Order)
+            
+            if status == "pending":
+                query = query.filter(Order.actual_delivery_date.is_(None))
+            elif status == "in_transit":
+                query = query.filter(
+                    Order.ship_date.isnot(None),
+                    Order.destination_arrival_date.is_(None)
+                )
+            elif status == "at_hub":
+                query = query.filter(
+                    Order.destination_arrival_date.isnot(None),
+                    Order.actual_delivery_date.is_(None)
+                )
+            elif status == "delivered":
+                query = query.filter(Order.actual_delivery_date.isnot(None))
+            else:
+                return []
+            
+            orders = query.all()
+            return [
+                {
+                    "id": o.id,
+                    "order_date": o.order_date,
+                    "promised_date": o.promised_date,
+                    "ship_date": o.ship_date,
+                    "destination_arrival_date": o.destination_arrival_date,
+                    "actual_delivery_date": o.actual_delivery_date,
+                    "origin_region": o.origin_region,
+                    "destination_region": o.destination_region,
+                    "mode_of_shipment": o.mode_of_shipment,
+                    "customer_rating": o.customer_rating,
+                    "customer_care_calls": o.customer_care_calls,
+                    "ticket_raised": o.ticket_raised,
+                    "product_cost": o.product_cost,
+                }
+                for o in orders
+            ]
+        finally:
+            session.close()
+    
     # ==================== CONVERSATION OPERATIONS ====================
     
     def create_conversation(self, order_id: int, signal_type: str) -> int:

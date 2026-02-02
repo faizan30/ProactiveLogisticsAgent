@@ -46,13 +46,20 @@ def get_openai_api_key() -> str:
 # Used by RiskEngine to detect deviations
 
 THRESHOLDS = {
-    # Time-based thresholds
-    "hub_hours": 48,            
-    "transit_days": 3,   
-    "days_remaining_buffer": 2,
+    # Hub threshold - max hours at destination hub before breach
+    "hub_hours": 24,
     
-    # Route risk threshold  
-    "route_failure_rate": 0.5,    # 40% failure rate = high risk route
+    # Transit threshold - buffer hours over route average
+    "transit_buffer_hours": 24,
+    
+    # Deadline pressure - hours remaining that triggers concern
+    "deadline_pressure_hours": 48,
+    
+    # Route risk threshold - failure rate above this = high risk
+    "route_failure_rate": 0.5,
+    
+    # Default transit hours for unknown routes (7 days)
+    "default_transit_hours": 168,
 }
 
 
@@ -62,7 +69,7 @@ THRESHOLDS = {
 KPI_CONFIG = {
     "tolerance_default_rating": 3,      # Default customer rating if missing
     "tolerance_max_calls": 5,           # 5+ calls = max frustration
-    "velocity_default_transit_days": 3.0,  # Default transit days for velocity model
+    "default_transit_hours": 168,       # 7 days default for unknown routes
 }
 
 

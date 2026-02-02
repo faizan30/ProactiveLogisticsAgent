@@ -61,11 +61,11 @@ def generate_demo_orders() -> List[Dict]:
             "product_cost": 150.0,
             "mocked_customer_response": None,  # No agent interaction needed
         },
-        # 1002: Predicted Delay - in transit 4 days, only 1 day left to promised date
+        # 1002: Predicted Delay - overdue order triggers PredictedDelayKPI
         {
             "id": 1002,
             "order_date": now - timedelta(days=6),
-            "promised_date": now + timedelta(days=1),
+            "promised_date": now - timedelta(hours=12),  # Overdue by 12 hours
             "ship_date": now - timedelta(days=4),
             "destination_arrival_date": None,
             "actual_delivery_date": None,

@@ -74,6 +74,30 @@ def bootstrap_endpoint():
     return result
 
 
+@app.get("/orders", tags=["demo"])
+def get_orders(status: str = None):
+    """Query orders by status.
+    
+    Status options:
+    - pending: Not yet delivered
+    - in_transit: Shipped but not at hub  
+    - at_hub: At hub but not delivered
+    - delivered: Already delivered
+    
+    If no status provided, returns all orders.
+    """
+    if status:
+        orders = app_state.db.get_orders_by_status(status)
+    else:
+        orders = app_state.db.get_all_orders()
+    
+    return {
+        "status_filter": status,
+        "count": len(orders),
+        "orders": orders,
+    }
+
+
 @app.get("/orders/{order_id}", tags=["demo"])
 def get_order(order_id: int = Path(ge=1)):
     """Step 2: Get order details."""
@@ -151,8 +175,3 @@ def view_response(order_id: int = Path(ge=1)):
     }
 
 
-@app.get("/orders", tags=["demo"])
-def list_orders():
-    """List all orders."""
-    orders = app_state.db.get_all_orders()
-    return {"orders": orders, "count": len(orders)}

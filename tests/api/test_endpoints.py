@@ -218,8 +218,8 @@ class TestKPIsEndpoint:
         kpis = data["kpis"]
         
         expected_kpis = [
-            "hub_hours", "transit_days", "days_remaining",
-            "route_failure_rate", "avg_transit_days", "ticket_raised"
+            "hub_hours", "transit_hours", "hours_remaining",
+            "route_failure_rate", "predicted_delay", "ticket_raised"
         ]
         for kpi in expected_kpis:
             assert kpi in kpis, f"Missing KPI: {kpi}"
@@ -231,7 +231,7 @@ class TestKPIsEndpoint:
         assert "thresholds" in data
         thresholds = data["thresholds"]
         assert "hub_hours" in thresholds
-        assert "transit_days" in thresholds
+        assert "transit_buffer_hours" in thresholds
     
     def test_get_kpis_returns_breaches(self, client):
         response = client.get("/kpis/1001")

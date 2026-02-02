@@ -129,13 +129,15 @@ def run_scenario(order_id: int, skip_agent: bool = False) -> dict:
         kpis = kpis_response.get("kpis", {})
         print("   KPI Values:")
         print(f"      hub_hours:          {kpis.get('hub_hours', 0):.1f}h")
-        print(f"      transit_days:       {kpis.get('transit_days', 0)}d")
-        print(f"      days_remaining:     {kpis.get('days_remaining', 0)}d")
-        print(f"      route_failure_rate: {kpis.get('route_failure_rate', 0):.1%}")
+        print(f"      transit_hours:      {kpis.get('transit_hours', 0):.1f}h")
+        print(f"      hours_remaining:    {kpis.get('hours_remaining', 0):.1f}h")
+        print(f"      route_failure_rate: {kpis.get('route_failure_rate', 0):.0%}")
+        print(f"      predicted_delay:    {'Yes' if kpis.get('predicted_delay', 0) > 0.5 else 'No'}")
         
         breaches = kpis_response.get("breaches", [])
         if breaches:
-            print(f"   ⚠️  Breaches: {', '.join(breaches)}")
+            breach_names = [b.get("kpi_name", str(b)) if isinstance(b, dict) else str(b) for b in breaches]
+            print(f"   ⚠️  Breaches: {', '.join(breach_names)}")
     
     # Step 4: Detect Risk
     print("\n4️⃣  DETECT RISK (POST /detect-deviation/{id})")

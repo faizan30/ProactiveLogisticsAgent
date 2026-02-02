@@ -58,11 +58,11 @@ def happy_path_order(now) -> Dict[str, Any]:
 
 @pytest.fixture
 def predicted_delay_order(now) -> Dict[str, Any]:
-    """Scenario 1002: In transit too long + near deadline."""
+    """Scenario 1002: Overdue order triggers predicted delay."""
     return {
         "id": 1002,
         "order_date": now - timedelta(days=6),
-        "promised_date": now + timedelta(days=1),
+        "promised_date": now - timedelta(hours=12),  # Overdue by 12 hours
         "ship_date": now - timedelta(days=4),
         "destination_arrival_date": None,
         "actual_delivery_date": None,
@@ -135,8 +135,9 @@ def sample_route_stats() -> Dict[str, Any]:
 def default_thresholds() -> Dict[str, float]:
     """Default threshold values matching config.py."""
     return {
-        "hub_hours": 48,
-        "transit_days": 3,
-        "days_remaining_buffer": 2,
+        "hub_hours": 24,
+        "transit_buffer_hours": 24,
+        "deadline_pressure_hours": 48,
         "route_failure_rate": 0.5,
+        "default_transit_hours": 168,
     }
