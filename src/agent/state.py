@@ -25,6 +25,7 @@ class AgentState(TypedDict):
     # Tracking
     actions_taken: list[str]  # Log of actions for supervisor context
     current_specialist: str | None  # Which specialist is active
+    turn_count: int  # Number of supervisor turns (for max_turns enforcement)
     
     # Resolution
     status: Literal["in_progress", "resolved", "failed"]
@@ -45,6 +46,7 @@ def create_initial_state(order: dict, signal_type: str, signal_reason: str) -> A
         messages=[],
         actions_taken=[],
         current_specialist=None,
+        turn_count=0,
         status="in_progress",
         resolution=None,
         conversation_turns=[],

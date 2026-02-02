@@ -154,7 +154,7 @@ def create_operations_agent():
     # Pre-build and compile the internal graph
     internal_graph = build_operations_graph().compile()
     
-    def operations_agent_node(state: AgentState, config: dict) -> dict:
+    def operations_agent_node(state: AgentState, config: dict = None) -> dict:
         """Execute OperationsAgent with internal sub-agents."""
         logger.info(f"[OPERATIONS] Starting for order #{state['order_id']}")
         
@@ -176,7 +176,7 @@ def create_operations_agent():
         }
         
         # Run internal graph
-        result = internal_graph.invoke(internal_state, config)
+        result = internal_graph.invoke(internal_state, config or {})
         
         # Build action log
         action_log = f"operations: {result['analysis'][:200]}"

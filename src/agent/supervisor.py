@@ -94,13 +94,31 @@ def get_checkpointer() -> PostgresSaver:
 
 # ==================== SUPERVISOR NODE ====================
 
-def supervisor_node(state: AgentState, config: dict) -> dict:
+def supervisor_node(state: AgentState, config: dict = None) -> dict:
     """
     Supervisor decides next action based on current state.
     
     Returns routing decision: OPERATIONS, CUSTOMER, RESOLUTION, or FINISH
+    Enforces max_turns limit from AGENT_CONFIG.
     """
-    logger.info(f"[SUPERVISOR] Evaluating state for order #{state['order_id']}")
+    turn_count = state.get("turn_count", 0) + 1
+    max_turns = AGENT_CONFIG["max_turns"]
+    
+    logger.info(f"[SUPERVISOR] Turn {turn_count}/{max_turns} for order #{state['order_id']}")
+    
+    # Enforce max_turns limit
+    if turn_count >= max_turns:
+        logger.warning(f"[SUPERVISOR] Max turns ({max_turns}) reached, forcing finish")
+        return {
+            "current_specialist": "finish",
+            "turn_count": turn_count,
+            "resolution": f"Resolution stopped: max turns ({max_turns}) reached. Actions taken: {', '.join(state['actions_taken']) if state['actions_taken'] else 'none'}",
+            "conversation_turns": state["conversation_turns"] + [{
+                "role": "supervisor",
+                "action": "max_turns_reached",
+                "message": f"Stopping after {max_turns} turns",
+            }],
+        }
     
     # Build context for supervisor
     context = f"""
@@ -133,7 +151,7 @@ NEXT: FINISH
         HumanMessage(content=context),
     ]
     
-    response = llm.invoke(messages, config=config)
+    response = llm.invoke(messages, config=config or {})
     response_text = response.content
     
     logger.info(f"[SUPERVISOR] Thinking: {response_text[:200]}...")
@@ -192,10 +210,11 @@ NEXT: FINISH
         "messages": [HumanMessage(content=task)],
         "resolution": resolution if next_node == "finish" else state.get("resolution"),
         "conversation_turns": state["conversation_turns"] + [supervisor_turn],
+        "turn_count": turn_count,
     }
 
 
-def finish_node(state: AgentState, config: dict) -> dict:
+def finish_node(state: AgentState, config: dict = None) -> dict:
     """Mark resolution as complete."""
     logger.info(f"[SUPERVISOR] ✓ Resolution complete for order #{state['order_id']}")
     

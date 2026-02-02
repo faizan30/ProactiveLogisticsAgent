@@ -29,29 +29,17 @@ from src.config import AGENT_CONFIG
 logger = logging.getLogger("agent.resolution")
 
 
-# Updated prompt that emphasizes policy checking
-RESOLUTION_WITH_POLICY_PROMPT = """You are a resolution specialist who executes actions.
+# Concise prompt - output must be SHORT
+RESOLUTION_WITH_POLICY_PROMPT = """You are a resolution specialist. Execute actions quickly.
 
-## CRITICAL: Check Policy First
-Before executing actions, call get_policy to understand the rules.
+IMPORTANT: Your final response must be ONE SHORT SENTENCE (max 15 words).
 
-## Your Capabilities
-- Process refunds (full refund)
-- Reschedule deliveries
-- Close support tickets
+Workflow:
+1. Execute action (refund or reschedule)
+2. Close ticket
+3. Reply with SHORT summary like: "Refund processed, ticket closed." or "Rescheduled to tomorrow, ticket closed."
 
-## Workflow
-1. Understand what resolution the customer wants
-2. Get the policy using get_policy tool
-3. Execute the appropriate action (refund or reschedule)
-4. Close the ticket with resolution summary
-
-## Guidelines
-- Check policy before acting
-- Refund is binary (full refund or no refund)
-- Reschedule within allowed timeframe (7 days)
-
-Use your tools: get_policy → execute action → close_ticket"""
+Do NOT write long explanations. Just execute and give a brief result."""
 
 
 def create_resolution_agent():
@@ -62,7 +50,7 @@ def create_resolution_agent():
     before executing any resolution actions.
     """
     
-    def resolution_agent_node(state: AgentState, config: dict) -> dict:
+    def resolution_agent_node(state: AgentState, config: dict = None) -> dict:
         """Execute ResolutionAgent with policy validation."""
         logger.info(f"[RESOLUTION] Starting for order #{state['order_id']}")
         
@@ -83,51 +71,35 @@ def create_resolution_agent():
             close_ticket,
         ]
         
-        agent = create_react_agent(
-            llm,
-            resolution_tools,
-            state_modifier=RESOLUTION_WITH_POLICY_PROMPT,
-        )
+        agent = create_react_agent(llm, resolution_tools)
         
-        # Build context
+        # Build context with system prompt included
         customer_pref = state.get("mocked_customer_response", "unknown")
         customer_rating = state["order"].get("customer_rating", 3)
         care_calls = state["order"].get("customer_care_calls", 0)
         
-        context = f"""
-Task: {task}
-Order ID: #{state['order_id']}
-Issue: {state['signal_type']} - {state['signal_reason']}
-Customer Preference: {customer_pref}
-Customer Rating: {customer_rating}/5
-Care Calls: {care_calls}
+        context = f"""{RESOLUTION_WITH_POLICY_PROMPT}
 
-Previous actions: {', '.join(state['actions_taken']) if state['actions_taken'] else 'None'}
-
-Execute the appropriate resolution:
-1. First, get the policy for the action type ({customer_pref})
-2. Check if the action is approved
-3. Execute if approved, or report escalation needed
-4. Close the ticket with summary
-"""
+Order #{state['order_id']} | {state['signal_type']} | Customer wants: {customer_pref}
+Execute now. Short reply only."""
         
-        # Run the agent
+        # Run the agent with strict recursion limit
         result = agent.invoke(
             {"messages": [HumanMessage(content=context)]},
-            config=config,
+            config={"recursion_limit": 5, **(config or {})},
         )
         
-        # Extract final response
+        # Extract final response and truncate to fit DB
         final_response = ""
         for msg in reversed(result.get("messages", [])):
             if isinstance(msg, AIMessage) and msg.content:
-                final_response = msg.content
+                final_response = msg.content[:100]  # Truncate to 100 chars
                 break
         
-        logger.info(f"[RESOLUTION] Result: {final_response[:200]}...")
+        logger.info(f"[RESOLUTION] Result: {final_response}")
         
-        # Build action log
-        action_log = f"resolution: {final_response[:200]}"
+        # Build action log (short)
+        action_log = f"resolution: {final_response}"
         
         # Build conversation turn
         turn = {

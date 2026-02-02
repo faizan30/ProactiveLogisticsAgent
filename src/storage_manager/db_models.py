@@ -41,7 +41,7 @@ class Conversation(Base):
     order_id = Column(Integer, index=True)
     signal_type = Column(String(30))
     status = Column(String(20), default="in_progress")  # in_progress, resolved
-    resolution = Column(String(20), nullable=True)  # refund, reschedule
+    resolution = Column(String(200), nullable=True)  # Short resolution summary
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

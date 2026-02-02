@@ -48,7 +48,17 @@ class CustomerAgentState(TypedDict):
 
 def drafter_agent(state: CustomerAgentState) -> dict:
     """DrafterAgent: Creates empathetic customer message."""
-    logger.info(f"[DRAFTER] Creating message for order #{state['order_id']}")
+    revision_count = state.get("revision_count", 0)
+    logger.info(f"[DRAFTER] Creating message for order #{state['order_id']} (revision {revision_count})")
+    
+    # Hard limit to prevent infinite loops
+    if revision_count >= 3:
+        logger.warning(f"[DRAFTER] Max revisions ({revision_count}) reached, using last draft")
+        return {
+            "draft_message": state.get("draft_message", "We apologize for the inconvenience with your order."),
+            "revision_count": revision_count,
+            "approved": True,  # Force approval to exit loop
+        }
     
     llm = ChatOpenAI(
         model=AGENT_CONFIG["specialist_model"],
@@ -151,10 +161,15 @@ def sender_agent(state: CustomerAgentState) -> dict:
 
 def should_revise(state: CustomerAgentState) -> str:
     """Route based on critic approval and revision count."""
-    if state.get("approved", False):
+    revision_count = state.get("revision_count", 0)
+    approved = state.get("approved", False)
+    
+    logger.info(f"[CUSTOMER] should_revise: approved={approved}, revision_count={revision_count}")
+    
+    if approved:
         return "sender"
-    elif state.get("revision_count", 0) >= 2:
-        logger.info("[CUSTOMER] Max revisions reached, sending anyway")
+    elif revision_count >= 2:
+        logger.info(f"[CUSTOMER] Max revisions ({revision_count}) reached, sending anyway")
         return "sender"
     else:
         return "drafter"
@@ -204,7 +219,7 @@ def create_customer_agent():
     # Pre-build and compile the internal graph
     internal_graph = build_customer_graph().compile()
     
-    def customer_agent_node(state: AgentState, config: dict) -> dict:
+    def customer_agent_node(state: AgentState, config: dict = None) -> dict:
         """Execute CustomerAgent with internal sub-agents."""
         logger.info(f"[CUSTOMER] Starting for order #{state['order_id']}")
         
@@ -228,7 +243,7 @@ def create_customer_agent():
         }
         
         # Run internal graph
-        result = internal_graph.invoke(internal_state, config)
+        result = internal_graph.invoke(internal_state, config or {})
         
         # Build action log
         action_log = f"customer: Sent message to customer. Response: {result['customer_response'][:100]}"

@@ -83,6 +83,13 @@ class TestAgentState:
         
         assert state["actions_taken"] == []
         assert state["conversation_turns"] == []
+    
+    def test_initial_state_turn_count_zero(self):
+        """Initial state should have turn_count = 0."""
+        order = {"id": 1001}
+        state = create_initial_state(order, "PREDICTED_DELAY", "Late")
+        
+        assert state["turn_count"] == 0
 
 
 class TestSpecialistNodesMocked:
@@ -145,6 +152,55 @@ class TestSpecialistNodesMocked:
         result = node_fn(mock_state, {})
         
         assert result["current_specialist"] is None
+
+
+class TestMaxTurnsEnforcement:
+    """Tests for max_turns limit enforcement."""
+    
+    @patch("src.agent.supervisor.ChatOpenAI")
+    def test_max_turns_forces_finish(self, mock_llm):
+        """Supervisor should force finish when max_turns reached."""
+        from src.agent.supervisor import supervisor_node
+        from src.config import AGENT_CONFIG
+        
+        # Create state at max_turns - 1 (next call will be at max)
+        state = create_initial_state(
+            order={"id": 1003, "origin_region": "North", "destination_region": "South",
+                   "customer_rating": 3, "customer_care_calls": 1},
+            signal_type="STUCK_AT_HUB",
+            signal_reason="Package at hub"
+        )
+        state["turn_count"] = AGENT_CONFIG["max_turns"] - 1
+        state["actions_taken"] = ["ops: hub contacted", "customer: message sent"]
+        
+        # Call supervisor - should hit max_turns
+        result = supervisor_node(state, {})
+        
+        assert result["current_specialist"] == "finish"
+        assert "max turns" in result["resolution"].lower()
+        assert result["turn_count"] == AGENT_CONFIG["max_turns"]
+    
+    @patch("src.agent.supervisor.ChatOpenAI")
+    def test_turn_count_increments(self, mock_llm):
+        """Supervisor should increment turn_count on each call."""
+        from src.agent.supervisor import supervisor_node
+        
+        # Mock LLM response
+        mock_response = MagicMock()
+        mock_response.content = "I need to check the hub status.\n\nNEXT: OPERATIONS"
+        mock_llm.return_value.invoke.return_value = mock_response
+        
+        state = create_initial_state(
+            order={"id": 1003, "origin_region": "North", "destination_region": "South",
+                   "customer_rating": 3, "customer_care_calls": 1},
+            signal_type="STUCK_AT_HUB",
+            signal_reason="Package at hub"
+        )
+        state["turn_count"] = 2
+        
+        result = supervisor_node(state, {})
+        
+        assert result["turn_count"] == 3
 
 
 class TestRunSupervisorMocked:

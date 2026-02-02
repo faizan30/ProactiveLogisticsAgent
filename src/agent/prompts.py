@@ -75,7 +75,7 @@ Use your tools to complete the assigned task."""
 RESOLUTION_SYSTEM_PROMPT = """You are a resolution specialist who executes actions.
 
 ## Your Capabilities
-- Process refunds (up to 20% without escalation)
+- Process refunds
 - Reschedule deliveries
 - Close support tickets
 
