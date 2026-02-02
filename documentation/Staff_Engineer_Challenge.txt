@@ -1,0 +1,65 @@
+
+2
+
+Automatic Zoom
+🚀 Celonis Garage – Technical Challenge
+Estimated Effort: ~6 hours
+Submission Format: Submission needs to be done at least 24h before the panel session
+● Architecture Document (PDF)
+● GitHub Repository (Codebase + ReadMe)
+● Optional: Summary Report / Slides
+💼 Business Context
+In Celonis Garage, we co-innovate with customers by leveraging emerging technologies like
+Process Mining, AI Agents, and Automation. This challenge simulates a retail e-commerce
+scenario where a company aims to proactively resolve operational issues before customers
+raise concerns.
+As part of this exercise, you’ll design and build a minimal, working solution that combines
+process KPI monitoring, issue prediction, and AI agent-driven resolution — reflecting the
+kind of innovation we explore in Garage.
+🔍 Challenge Scenario
+A retail company wants to improve customer satisfaction by identifying potential delivery
+delays before they happen and responding intelligently without waiting for a support ticket.
+You are expected to:
+● Monitor operational KPIs based on available process data
+● Detect or predict deviations
+● Trigger an autonomous AI Agent to simulate resolving the issue
+● Build an architecture that reflects engineering rigor and AI-first thinking
+📊 Dataset & Process Context
+Use the Customer Analytics Dataset from Kaggle (CSV format) which represents a retail
+order-to-ship process. You may enrich or preprocess this as needed (e.g., generate delivery
+time, simulate promised dates).
+Key fields available:
+● Order Date, Ship Date, Segment, Region, Product Category, etc.
+KPIs to consider:
+● Predicted Delivery Delay: Estimate if a shipment is likely to be late before it actually is
+● Segment Risk Score: Certain segments show higher risk of delays
+● Fulfillment Gaps: Order marked as shipped but no delivery within expected window
+● (Optional) Simulate additional fields like Payment Status, Ticket Raised, etc.
+✅ Objectives
+You are encouraged to define and design the solution creatively, but must demonstrate:
+Functional Requirements
+1. Data Load & KPI Derivation
+○ Load and preprocess dataset (no DB needed)
+○ Define and compute KPIs (rule-based or predictive)
+2. Deviation / Risk Detection
+○ Detect threshold breaches or predict future risks
+○ Proactive rather than reactive — can use ML or heuristics
+3. Autonomous AI Agent
+○ Triggered automatically when a deviation is detected
+○ Performs simulated resolution (e.g., draft customer response, initiate refund,
+reschedule)
+○ Should demonstrate multi-turn capability (can be mocked)
+4. Interaction Layer
+○ REST API or simple CLI/streamlit UI to trigger and view agent responses
+○ Modular endpoints (e.g., /detect-deviation, /trigger-agent,
+/view-response)
+🔧 Non-Functional Requirements
+● Cloud-native readiness (Dockerized setup)
+● Modular architecture with component separation (KPI logic, Agent, APIs)
+● Extensible (can support more agents, KPIs later)
+● Well-documented for setup, assumptions, and extension
+📁 Deliverables
+1. Architecture Document (PDF)
+● System Overview & Goals
+● Architecture Diagram(s)
+● Component Roles
