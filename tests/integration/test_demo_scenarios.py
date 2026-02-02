@@ -50,8 +50,8 @@ class TestScenario1001HappyPath:
         result = engine.calculate_kpis(order)
         
         assert result.kpis["hub_hours"] == 0.0
-        assert result.kpis["transit_days"] >= 0
-        assert result.kpis["days_remaining"] > 2
+        assert result.kpis["transit_hours"] >= 0
+        assert result.kpis["hours_remaining"] > 48  # More than 2 days
         assert result.kpis["ticket_raised"] == 0
         assert len(result.breaches) == 0
     
@@ -69,8 +69,7 @@ class TestScenario1002PredictedDelay:
     """
     Scenario 1002: Predicted Delay
     
-    Order in transit for 4 days (exceeds 3-day threshold),
-    only 1 day remaining until promised date (under 2-day buffer).
+    Order is overdue (hours_remaining < 0), triggering PredictedDelayKPI.
     Expected: PREDICTED_DELAY signal with HIGH severity.
     """
     
@@ -100,13 +99,12 @@ class TestScenario1002PredictedDelay:
         """KPIs show delay indicators."""
         result = engine.calculate_kpis(order)
         
-        assert result.kpis["transit_days"] > 3
-        assert result.kpis["days_remaining"] < 2
+        assert result.kpis["hours_remaining"] < 0  # Overdue
         assert result.kpis["hub_hours"] == 0.0
         
         breach_names = [b.kpi_name for b in result.breaches]
-        assert "transit_days" in breach_names
-        assert "days_remaining" in breach_names
+        assert "hours_remaining" in breach_names
+        assert "predicted_delay" in breach_names
     
     def test_detection_result(self, engine, order):
         """Detects PREDICTED_DELAY signal."""
@@ -151,8 +149,8 @@ class TestScenario1003StuckAtHub:
         """KPIs show hub delay."""
         result = engine.calculate_kpis(order)
         
-        assert result.kpis["hub_hours"] > 48
-        assert result.kpis["transit_days"] == 0.0
+        assert result.kpis["hub_hours"] > 24  # Exceeds 24h threshold
+        assert result.kpis["transit_hours"] == 0.0
         
         breach_names = [b.kpi_name for b in result.breaches]
         assert "hub_hours" in breach_names
@@ -200,7 +198,7 @@ class TestScenario1004TicketRaised:
         result = engine.calculate_kpis(order)
         
         assert result.kpis["ticket_raised"] == 1
-        assert result.kpis["days_remaining"] < 0
+        assert result.kpis["hours_remaining"] < 0  # Overdue
     
     def test_detection_result(self, engine, order):
         """Detects TICKET_RAISED signal (highest priority)."""

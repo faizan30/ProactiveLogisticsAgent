@@ -3,8 +3,8 @@ Unit tests for RiskEngine detection logic.
 
 Tests the priority-based signal detection:
 1. TICKET_RAISED (highest priority - reactive)
-2. STUCK_AT_HUB (hub_hours breach)
-3. PREDICTED_DELAY (transit_days + days_remaining breach)
+2. STUCK_AT_HUB (hub_hours > 24h)
+3. PREDICTED_DELAY (composite KPI breach)
 4. ON_TRACK (default)
 """
 import pytest
@@ -27,8 +27,8 @@ class TestRiskEngineInit:
         """Engine loads thresholds from config."""
         engine = RiskEngine()
         assert "hub_hours" in engine.thresholds
-        assert "transit_days" in engine.thresholds
-        assert "days_remaining_buffer" in engine.thresholds
+        assert "transit_buffer_hours" in engine.thresholds
+        assert "deadline_pressure_hours" in engine.thresholds
     
     def test_loads_all_kpis(self):
         """Engine loads all 5 KPIs."""
@@ -36,10 +36,10 @@ class TestRiskEngineInit:
         assert len(engine.kpis) == 5
         kpi_names = [kpi.name for kpi in engine.kpis]
         assert "hub_hours" in kpi_names
-        assert "transit_days" in kpi_names
-        assert "days_remaining" in kpi_names
+        assert "transit_hours" in kpi_names
+        assert "hours_remaining" in kpi_names
         assert "route_failure_rate" in kpi_names
-        assert "avg_transit_days" in kpi_names
+        assert "predicted_delay" in kpi_names
 
 
 class TestRiskEngineCalculateKPIs:
@@ -61,10 +61,10 @@ class TestRiskEngineCalculateKPIs:
         """Calculates all 5 KPIs plus ticket_raised."""
         result = engine.calculate_kpis(happy_path_order, now)
         assert "hub_hours" in result.kpis
-        assert "transit_days" in result.kpis
-        assert "days_remaining" in result.kpis
+        assert "transit_hours" in result.kpis
+        assert "hours_remaining" in result.kpis
         assert "route_failure_rate" in result.kpis
-        assert "avg_transit_days" in result.kpis
+        assert "predicted_delay" in result.kpis
         assert "ticket_raised" in result.kpis
     
     def test_happy_path_no_breaches(self, engine, happy_path_order, now):
@@ -159,7 +159,7 @@ class TestDetectPriority2StuckAtHub:
 
 
 class TestDetectPriority3PredictedDelay:
-    """Priority 3: PREDICTED_DELAY when transit + deadline breaches."""
+    """Priority 3: PREDICTED_DELAY from composite KPI."""
     
     @pytest.fixture
     def engine(self):
@@ -171,37 +171,37 @@ class TestDetectPriority3PredictedDelay:
         assert signal.signal_type == SignalType.PREDICTED_DELAY
         assert signal.severity == Severity.HIGH
     
-    def test_requires_both_breaches(self, engine, now):
-        """PREDICTED_DELAY requires BOTH transit_days AND days_remaining breach."""
-        order_transit_only = {
+    def test_no_delay_when_plenty_of_time(self, engine, now):
+        """Slow transit but plenty of time = ON_TRACK (no deadline pressure)."""
+        order_no_pressure = {
+            "id": 9999,
+            "ship_date": now - timedelta(hours=200),  # Slow transit
+            "destination_arrival_date": None,
+            "actual_delivery_date": None,
+            "promised_date": now + timedelta(days=10),  # Plenty of time
+            "ticket_raised": 0,
+            "origin_region": "South",
+            "destination_region": "Midwest",
+            "mode_of_shipment": "Flight",
+        }
+        signal = engine.detect(order_no_pressure, now)
+        assert signal.signal_type == SignalType.ON_TRACK
+    
+    def test_delay_when_overdue(self, engine, now):
+        """Overdue order = PREDICTED_DELAY."""
+        order_overdue = {
             "id": 9999,
             "ship_date": now - timedelta(days=5),
             "destination_arrival_date": None,
             "actual_delivery_date": None,
-            "promised_date": now + timedelta(days=10),
+            "promised_date": now - timedelta(hours=1),  # Overdue
             "ticket_raised": 0,
             "origin_region": "South",
             "destination_region": "Midwest",
             "mode_of_shipment": "Flight",
         }
-        signal = engine.detect(order_transit_only, now)
-        assert signal.signal_type == SignalType.ON_TRACK
-    
-    def test_requires_both_breaches_deadline_only(self, engine, now):
-        """Only deadline breach without transit = ON_TRACK."""
-        order_deadline_only = {
-            "id": 9999,
-            "ship_date": now - timedelta(days=1),
-            "destination_arrival_date": None,
-            "actual_delivery_date": None,
-            "promised_date": now + timedelta(days=1),
-            "ticket_raised": 0,
-            "origin_region": "South",
-            "destination_region": "Midwest",
-            "mode_of_shipment": "Flight",
-        }
-        signal = engine.detect(order_deadline_only, now)
-        assert signal.signal_type == SignalType.ON_TRACK
+        signal = engine.detect(order_overdue, now)
+        assert signal.signal_type == SignalType.PREDICTED_DELAY
 
 
 class TestDetectPriority4OnTrack:
@@ -259,10 +259,10 @@ class TestRiskEngineEdgeCases:
         assert signal.signal_type == SignalType.ON_TRACK
     
     def test_hub_hours_exactly_at_threshold(self, engine, now):
-        """Hub hours exactly at 48 = no breach (> not >=)."""
+        """Hub hours exactly at 24 = no breach (> not >=)."""
         order = {
             "id": 9999,
-            "destination_arrival_date": now - timedelta(hours=48),
+            "destination_arrival_date": now - timedelta(hours=24),
             "actual_delivery_date": None,
             "ship_date": now - timedelta(days=3),
             "promised_date": now + timedelta(days=5),
@@ -275,10 +275,10 @@ class TestRiskEngineEdgeCases:
         assert signal.signal_type == SignalType.ON_TRACK
     
     def test_hub_hours_just_over_threshold(self, engine, now):
-        """Hub hours at 49 = breach."""
+        """Hub hours at 25 = breach."""
         order = {
             "id": 9999,
-            "destination_arrival_date": now - timedelta(hours=49),
+            "destination_arrival_date": now - timedelta(hours=25),
             "actual_delivery_date": None,
             "ship_date": now - timedelta(days=3),
             "promised_date": now + timedelta(days=5),
@@ -294,6 +294,6 @@ class TestRiskEngineEdgeCases:
         """Signal includes all calculated KPI values."""
         signal = engine.detect(happy_path_order, now)
         assert "hub_hours" in signal.kpis
-        assert "transit_days" in signal.kpis
-        assert "days_remaining" in signal.kpis
+        assert "transit_hours" in signal.kpis
+        assert "hours_remaining" in signal.kpis
         assert "ticket_raised" in signal.kpis

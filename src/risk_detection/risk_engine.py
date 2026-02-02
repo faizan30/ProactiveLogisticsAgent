@@ -1,12 +1,15 @@
 """
 RiskEngine - Threshold-based risk detection using KPI classes.
 
+See README.md for detailed design documentation.
+
 Detection Priority:
-1. Ticket Raised → TICKET_RAISED (reactive)
-2. Stuck at Hub > threshold → STUCK_AT_HUB
-3. In transit too long + near deadline → PREDICTED_DELAY
-4. Otherwise → ON_TRACK
+1. TICKET_RAISED  → Customer complained (reactive, highest priority)
+2. STUCK_AT_HUB   → Package idle at hub > 24h (actionable)
+3. PREDICTED_DELAY → Proactive delay prediction (preventive)
+4. ON_TRACK       → No issues detected (default)
 """
+import logging
 from datetime import datetime
 from typing import Dict
 import json
@@ -14,7 +17,9 @@ from pathlib import Path
 
 from src.contracts.models import SignalType, Severity, RiskSignal, KPIResult
 from src.config import THRESHOLDS
-from src.risk_detection.kpis import ALL_KPIS
+from src.risk_detection.kpis import ALL_KPIS, get_current_time
+
+logger = logging.getLogger(__name__)
 
 
 def load_route_stats() -> Dict:
@@ -36,17 +41,28 @@ class RiskEngine:
     
     def calculate_kpis(self, order: dict, now: datetime = None) -> KPIResult:
         """Calculate all KPIs and check breaches using KPI classes."""
-        now = now or datetime.now()
-        context = {"now": now, "route_stats": self.route_stats}
+        now = now or get_current_time()
+        context = {
+            "now": now,
+            "route_stats": self.route_stats,
+            "thresholds": self.thresholds,  # Pass thresholds for composite KPIs
+            "order": order,
+            "kpi_values": {},  # Will be populated as we calculate
+            "breaches": [],    # Will be populated - allows composite KPIs to check breaches
+        }
         
         # Calculate each KPI and check for breaches
         kpi_values = {}
         breaches = []
         for kpi in self.kpis:
+            # Update context with calculated values and breaches for composite KPIs
+            context["kpi_values"] = kpi_values
+            context["breaches"] = breaches
+            
             value = kpi.calculate(order, context)
             kpi_values[kpi.name] = value
             
-            breach_result = kpi.is_breached(value, self.thresholds)
+            breach_result = kpi.is_breached(value, self.thresholds, context)
             if breach_result.breached:
                 breaches.append(breach_result)
         
@@ -68,13 +84,16 @@ class RiskEngine:
         return None
     
     def detect(self, order: dict, now: datetime = None) -> RiskSignal:
-        """Detect risk signal based on KPIs and breaches. Priority logic here."""
-        now = now or datetime.now()
+        """Detect risk signal based on KPIs and breaches. Simplified priority logic."""
+        now = now or get_current_time()
         kpi_result = self.calculate_kpis(order, now)
         kpis = kpi_result.kpis
         breaches = kpi_result.breaches
         
-        # Priority 1: Ticket raised → reactive (not a KPI breach, direct field)
+        logger.debug(f"Order {order.get('id')}: KPIs={kpis}, breaches={[b.kpi_name for b in breaches]}")
+        
+        # Priority 1: Ticket raised → reactive (highest priority)
+        # Customer has already escalated, requires immediate response
         if kpis["ticket_raised"] == 1:
             return RiskSignal(
                 order_id=order["id"],
@@ -84,7 +103,8 @@ class RiskEngine:
                 kpis=kpis
             )
         
-        # Priority 2: Stuck at hub
+        # Priority 2: Stuck at hub → actionable
+        # Clear operational issue that can be resolved
         hub_breach = self._get_breach(breaches, "hub_hours")
         if hub_breach:
             return RiskSignal(
@@ -95,15 +115,15 @@ class RiskEngine:
                 kpis=kpis
             )
         
-        # Priority 3: Predicted delay (transit breach + days_remaining breach)
-        transit_breach = self._get_breach(breaches, "transit_days")
-        remaining_breach = self._get_breach(breaches, "days_remaining")
-        if transit_breach and remaining_breach:
+        # Priority 3: Predicted delay → proactive
+        # Composite KPI handles the complex logic
+        predicted_breach = self._get_breach(breaches, "predicted_delay")
+        if predicted_breach:
             return RiskSignal(
                 order_id=order["id"],
                 signal_type=SignalType.PREDICTED_DELAY,
-                severity=Severity.HIGH,
-                reason=f"{transit_breach.reason}; {remaining_breach.reason}",
+                severity=predicted_breach.severity,
+                reason=predicted_breach.reason,
                 kpis=kpis
             )
         
