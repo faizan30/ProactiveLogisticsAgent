@@ -75,3 +75,24 @@ class Conversation(BaseModel):
     turns: list[ConversationTurn] = Field(default_factory=list)
     status: str = "in_progress"  # in_progress, resolved
     resolution: Optional[str] = None  # refund, reschedule, none
+
+
+class Order(BaseModel):
+    """Order data with validation for risk detection."""
+    id: int
+    order_date: Optional[datetime] = None
+    promised_date: Optional[datetime] = None
+    ship_date: Optional[datetime] = None
+    destination_arrival_date: Optional[datetime] = None
+    actual_delivery_date: Optional[datetime] = None
+    origin_region: Optional[str] = None
+    destination_region: Optional[str] = None
+    mode_of_shipment: Optional[str] = None
+    customer_rating: Optional[int] = Field(default=None, ge=1, le=5)
+    customer_care_calls: int = 0
+    ticket_raised: int = Field(default=0, ge=0, le=1)
+    product_cost: Optional[float] = Field(default=None, ge=0)
+    mocked_customer_response: Optional[str] = None
+    
+    class Config:
+        extra = "allow"  # Allow additional fields

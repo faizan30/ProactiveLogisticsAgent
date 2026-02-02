@@ -10,8 +10,14 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Dict, Any
 
-from src.config import KPI_CONFIG, THRESHOLDS
+from src.config import KPI_CONFIG, THRESHOLDS, SEVERITY_CONFIG
 from src.contracts.models import BreachResult, Severity
+
+
+def get_severity(kpi_name: str) -> Severity:
+    """Get configurable severity for a KPI from SEVERITY_CONFIG."""
+    severity_str = SEVERITY_CONFIG.get(kpi_name, "MEDIUM")
+    return Severity(severity_str)
 
 
 # Constants
@@ -68,7 +74,7 @@ class HubHoursKPI(KPI):
             value=value,
             threshold=threshold,
             reason=f"Package at hub for {value:.0f}h (threshold: {threshold}h)" if breached else None,
-            severity=Severity.HIGH if breached else None
+            severity=get_severity(self.name) if breached else None
         )
 
 
@@ -124,7 +130,7 @@ class TransitHoursKPI(KPI):
             value=value,
             threshold=threshold,
             reason=f"In transit {value:.0f}h (expected: {route_avg_hours:.0f}h + {buffer}h buffer)" if breached else None,
-            severity=Severity.MEDIUM if breached else None
+            severity=get_severity(self.name) if breached else None
         )
 
 
@@ -149,7 +155,7 @@ class HoursRemainingKPI(KPI):
             value=value,
             threshold=0,
             reason=f"Overdue by {abs(value):.0f}h" if breached else None,
-            severity=Severity.CRITICAL if breached else None
+            severity=get_severity(self.name) if breached else None
         )
 
 
@@ -180,7 +186,7 @@ class RouteRiskKPI(KPI):
             value=value,
             threshold=threshold,
             reason=f"High-risk route ({value:.0%} failure rate)" if breached else None,
-            severity=Severity.MEDIUM if breached else None
+            severity=get_severity(self.name) if breached else None
         )
 
 
@@ -238,7 +244,7 @@ class PredictedDelayKPI(KPI):
             value=value,
             threshold=0.5,
             reason="Delivery delay predicted based on transit time and deadline" if breached else None,
-            severity=Severity.HIGH if breached else None
+            severity=get_severity(self.name) if breached else None
         )
 
 

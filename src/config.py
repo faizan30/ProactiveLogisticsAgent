@@ -63,6 +63,19 @@ THRESHOLDS = {
 }
 
 
+# ==================== SEVERITY WEIGHTS ====================
+# Configurable severity levels for each KPI breach
+
+SEVERITY_CONFIG = {
+    "hub_hours": "HIGH",           # Package stuck at hub
+    "transit_hours": "MEDIUM",     # Slow transit
+    "hours_remaining": "CRITICAL", # Overdue
+    "route_failure_rate": "MEDIUM",# High-risk route
+    "predicted_delay": "HIGH",     # Composite delay prediction
+    "ticket_raised": "CRITICAL",   # Customer escalation
+}
+
+
 # ==================== KPI BASELINE VALUES ====================
 # Used for normalization in KPI calculations
 
