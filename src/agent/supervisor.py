@@ -160,8 +160,8 @@ NEXT: FINISH
     response_lower = response_text.lower()
     if "next: finish" in response_lower or "finish" in response_lower.split('\n')[-1]:
         next_node = "finish"
-        # Extract resolution summary
-        resolution = response_text.split("NEXT:")[0].strip() if "NEXT:" in response_text else response_text
+        # Simple short resolution for DB (VARCHAR 20 in existing schema)
+        resolution = "Resolved"
     elif "next: operations" in response_lower:
         next_node = "operations"
         resolution = None
@@ -218,13 +218,14 @@ def finish_node(state: AgentState, config: dict = None) -> dict:
     """Mark resolution as complete."""
     logger.info(f"[SUPERVISOR] ✓ Resolution complete for order #{state['order_id']}")
     
-    resolution_summary = state.get("resolution") or "Issue resolved successfully."
+    # Truncate resolution to fit DB (max 200 chars)
+    resolution_summary = (state.get("resolution") or "Issue resolved successfully.")[:200]
     
     # Final turn
     final_turn = {
         "role": "supervisor",
         "action": "finish",
-        "message": f"Resolution complete: {resolution_summary}",
+        "message": f"Resolution complete: {resolution_summary[:100]}",
     }
     
     return {
