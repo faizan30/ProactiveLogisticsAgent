@@ -3,17 +3,54 @@ Mocked Tools for Specialist Agents
 
 All tools return mocked responses for demo purposes.
 In production, these would integrate with real systems.
+
+Tool Categories:
+- POLICY_TOOLS: Policy retrieval (reads data/policy.md)
+- OPERATIONS_TOOLS: Hub, shipment, customer stats
+- CUSTOMER_TOOLS: Customer communication
+- RESOLUTION_TOOLS: Action execution
 """
+import json
 import logging
 from datetime import datetime, timedelta
 from typing import Annotated
 
 from langchain_core.tools import tool
 
+from src.agent.retrieve import get_policy as _get_policy, get_customer_stats as _get_customer_stats
+
 logger = logging.getLogger("agent.tools")
 
 
+# ==================== POLICY TOOL ====================
+
+@tool
+def get_policy() -> str:
+    """
+    Retrieve company resolution policies from data/policy.md.
+    
+    Returns the full policy document for LLM to process.
+    """
+    logger.info("[TOOL] get_policy called")
+    return _get_policy()
+
+
 # ==================== OPERATIONS TOOLS ====================
+
+@tool
+def get_customer_stats(customer_rating: Annotated[int, "Customer rating 1-5"]) -> str:
+    """
+    Get aggregated statistics for customers with this rating.
+    
+    Returns avg_care_calls, complaint_rate, avg_prior_purchases.
+    Useful for understanding customer behavior patterns.
+    """
+    logger.info(f"[TOOL] get_customer_stats for rating {customer_rating}")
+    stats = _get_customer_stats()
+    rating_stats = stats.get(str(customer_rating), {})
+    if rating_stats:
+        return f"Customer stats for rating {customer_rating}: {json.dumps(rating_stats)}"
+    return f"No stats found for rating {customer_rating}"
 
 @tool
 def contact_hub(order_id: Annotated[int, "The order ID to check"]) -> str:
@@ -63,14 +100,11 @@ def get_customer_response(
 # ==================== RESOLUTION TOOLS ====================
 
 @tool
-def process_refund(
-    order_id: Annotated[int, "The order ID"],
-    refund_percent: Annotated[int, "Refund percentage (1-100)"]
-) -> str:
-    """Process a refund for the customer."""
-    logger.info(f"[TOOL] process_refund for order {order_id}: {refund_percent}%")
+def process_refund(order_id: Annotated[int, "The order ID"]) -> str:
+    """Process a full refund for the customer."""
+    logger.info(f"[TOOL] process_refund for order {order_id}")
     # Mocked - in production would call payment system
-    return f"Refund processed: {refund_percent}% refund issued for order #{order_id}. Confirmation sent to customer."
+    return f"Refund processed for order #{order_id}. Full refund issued. Confirmation sent to customer."
 
 
 @tool
@@ -98,8 +132,9 @@ def close_ticket(
 
 # ==================== TOOL COLLECTIONS ====================
 
-OPERATIONS_TOOLS = [contact_hub, check_shipment_status]
+POLICY_TOOLS = [get_policy]
+OPERATIONS_TOOLS = [contact_hub, check_shipment_status, get_customer_stats]
 CUSTOMER_TOOLS = [send_message, get_customer_response]
-RESOLUTION_TOOLS = [process_refund, reschedule_delivery, close_ticket]
+RESOLUTION_TOOLS = [get_policy, process_refund, reschedule_delivery, close_ticket]
 
-ALL_TOOLS = OPERATIONS_TOOLS + CUSTOMER_TOOLS + RESOLUTION_TOOLS
+ALL_TOOLS = POLICY_TOOLS + OPERATIONS_TOOLS + CUSTOMER_TOOLS + RESOLUTION_TOOLS

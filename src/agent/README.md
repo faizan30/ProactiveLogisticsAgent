@@ -9,34 +9,47 @@ A LangGraph-based multi-agent system where an LLM supervisor dynamically orchest
                                     │
                                     ▼
                     ┌───────────────────────────────┐
-                    │         SUPERVISOR            │
+                    │       TRUE SUPERVISOR         │
                     │         (gpt-5.2)             │
                     │  ━━━━━━━━━━━━━━━━━━━━━━━━━━   │
+                    │  • LLM-driven decisions       │
                     │  • Analyzes signal + context  │
-                    │  • Decides next specialist    │
-                    │  • Evaluates results          │
-                    │  • Loops until FINISH         │
+                    │  • Evaluates agent results    │
+                    │  • Iterates until FINISH      │
                     └───────────────┬───────────────┘
                                     │
-           ┌────────────────────────┼────────────────────────┐
-           ▼                        ▼                        ▼
+         ┌──────────────────────────┼──────────────────────────┐
+         ▼                          ▼                          ▼
 ┌─────────────────────┐  ┌─────────────────────┐  ┌─────────────────────┐
 │  OPERATIONS AGENT   │  │   CUSTOMER AGENT    │  │  RESOLUTION AGENT   │
-│     (gpt-5.1)       │  │     (gpt-5.1)       │  │     (gpt-5.1)       │
-│  ━━━━━━━━━━━━━━━━   │  │   ━━━━━━━━━━━━━━━   │  │  ━━━━━━━━━━━━━━━━   │
-│  • contact_hub      │  │   • send_message    │  │  • process_refund   │
-│  • check_shipment   │  │   • get_response    │  │  • reschedule       │
+│  ═══════════════════│  │  ═══════════════════│  │  ═══════════════════│
+│                     │  │                     │  │                     │
+│  ┌───────────────┐  │  │  ┌───────────────┐  │  │  Tools:             │
+│  │  Researcher   │  │  │  │   Drafter     │  │  │  • get_policy       │
+│  └───────┬───────┘  │  │  │    Agent      │  │  │    (reads policy.md)│
+│          ▼          │  │  └───────┬───────┘  │  │  • check_refund     │
+│  ┌───────────────┐  │  │          ▼          │  │  • process_refund   │
+│  │   Analyzer    │  │  │  ┌───────────────┐  │  │  • reschedule       │
+│  │    Agent      │  │  │  │    Critic     │  │  │  • close_ticket     │
+│  └───────────────┘  │  │  │    Agent      │  │  │                     │
+│                     │  │  └───────────────┘  │  │                     │
+│  Tools:             │  │                     │  │                     │
+│  • contact_hub      │  │  Tools:             │  │                     │
+│  • check_shipment   │  │  • send_message     │  │                     │
+│                     │  │  • get_response     │  │                     │
 └─────────────────────┘  └─────────────────────┘  └─────────────────────┘
-           │                        │                        │
-           └────────────────────────┼────────────────────────┘
-                                    ▼
+                                    │
                     ┌───────────────────────────────┐
                     │      Postgres Checkpointer    │
                     │      + Langfuse Tracing       │
                     └───────────────────────────────┘
 ```
 
-**4 separate LLM instances** — supervisor decides WHO acts, specialists execute HOW.
+**True Multi-Agent System:**
+- **Supervisor:** LLM-driven orchestrator (not a router)
+- **CustomerAgent:** DrafterAgent → CriticAgent → Send (internal sub-agents)
+- **OperationsAgent:** Researcher → Analyzer (contacts hub, analyzes findings)
+- **ResolutionAgent:** Uses `get_policy` tool to read `data/policy.md`
 
 ---
 
@@ -86,13 +99,14 @@ src/agent/
 ├── __init__.py              # Exports run_supervisor
 ├── supervisor.py            # LangGraph graph + supervisor node
 ├── state.py                 # AgentState TypedDict
-├── tools.py                 # Mocked tools (6 tools)
-├── prompts.py               # System prompts (4 prompts)
+├── tools.py                 # Tools (8 tools)
+├── prompts.py               # System prompts + sub-agent prompts
+├── retrieve.py              # Simple file readers (policy.md, customer_stats.json)
 └── specialists/
     ├── base.py              # create_specialist_node factory
-    ├── customer_agent.py
-    ├── operations_agent.py
-    └── resolution_agent.py
+    ├── customer_agent.py    # Drafter → Critic → Sender
+    ├── operations_agent.py  # Researcher → Analyzer
+    └── resolution_agent.py  # Policy-aware execution
 ```
 
 ---
@@ -168,12 +182,45 @@ A hardcoded router (`if signal == X: return Y`) can't:
 - Adapt when specialist returns unexpected info
 - Demonstrate AI reasoning
 
+### Why File-Based Data (Not DB)?
+Tools read from JSON/markdown files in `data/`:
+- **Policy:** `data/policy.md` — ~2KB, fits in context
+- **Customer stats:** `data/customer_stats.json` — precomputed from CSV
+- **Route stats:** `data/route_stats.json` — precomputed from CSV
+
+This avoids DB complexity for demo. In production, swap file reads with Postgres queries.
+
+### Why Precomputed Stats?
+Following `route_stats.json` pattern:
+```bash
+# Generate stats from CSV
+python -m src.data_preprocessing.customer_stats_generator
+python -m src.data_preprocessing.route_stats_generator
+```
+
+Tools just read the JSON — no complex logic, LLM processes the data.
+
+### Why Binary Refund (Not Percentage)?
+Refund decision is yes/no. The LLM reads policy and decides whether to refund based on context. No percentage validation logic needed.
+
 ---
 
 ## Future Enhancements
 
-1. **Multi-provider testing** — Benchmark OpenAI vs Claude vs Gemini
-2. **Real integrations** — Connect to actual hub APIs, payment systems
-3. **HITL mode** — Human approval for high-value refunds
-4. **Streaming** — Real-time agent responses
-5. **Escalation** — Route to human for unresolvable cases
+### LiteLLM Integration
+- **Easy model swap** — Switch between OpenAI/Claude/Gemini without code changes
+- **Model routing** — Route requests to different models based on task complexity
+- **Fallback chains** — Auto-fallback to backup model on failures
+- **Rate limits** — Handle rate limiting with automatic retries
+- **Cost tracking** — Monitor token usage and costs per model
+
+### Model Testing
+- **Latency benchmarks** — Compare response times across providers
+- **Accuracy evaluation** — Test resolution quality per model
+- **Cost-performance tradeoffs** — Find optimal model for each agent role
+
+### Other
+- **Real integrations** — Connect to actual hub APIs, payment systems
+- **HITL mode** — Human approval for high-value refunds
+- **Streaming** — Real-time agent responses
+- **Escalation routing** — Route to human for unresolvable cases

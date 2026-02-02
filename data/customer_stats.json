@@ -1,0 +1,32 @@
+{
+  "1": {
+    "avg_care_calls": 4.0,
+    "avg_prior_purchases": 3.5,
+    "complaint_rate": 0.4,
+    "sample_size": 2235
+  },
+  "2": {
+    "avg_care_calls": 4.0,
+    "avg_prior_purchases": 3.6,
+    "complaint_rate": 0.42,
+    "sample_size": 2165
+  },
+  "3": {
+    "avg_care_calls": 4.1,
+    "avg_prior_purchases": 3.6,
+    "complaint_rate": 0.4,
+    "sample_size": 2239
+  },
+  "4": {
+    "avg_care_calls": 4.0,
+    "avg_prior_purchases": 3.6,
+    "complaint_rate": 0.41,
+    "sample_size": 2189
+  },
+  "5": {
+    "avg_care_calls": 4.1,
+    "avg_prior_purchases": 3.6,
+    "complaint_rate": 0.42,
+    "sample_size": 2171
+  }
+}

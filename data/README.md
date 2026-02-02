@@ -4,11 +4,13 @@ Datasets for the Proactive Logistics Agent.
 
 ## Files
 
-| File | Rows | Columns | Purpose |
-|------|------|---------|---------|
-| `Original_data.csv` | 10,999 | 12 | Kaggle source dataset |
-| `Celonis_Garage_Enriched_Data_Final.csv` | 10,999 | 28 | Enriched with 16 synthetic columns |
-| `route_stats.json` | 75 routes | 3 fields | Route performance for KPI thresholds |
+| File | Purpose |
+|------|---------|
+| `Original_data.csv` | Kaggle source dataset (10,999 rows, 12 cols) |
+| `Celonis_Garage_Enriched_Data_Final.csv` | Enriched with 16 synthetic columns |
+| `route_stats.json` | Route performance for KPI thresholds (75 routes) |
+| `customer_stats.json` | Customer behavior by rating (1-5) for agent context |
+| `policy.md` | Company resolution policies for agent decisions |
 
 ## Data Pipeline
 
