@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: celonis_garage_agent
+    ports:
+      - "9001:9001"
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    depends_on:
+      - db
+
+  db:
+    image: postgres:15-alpine
+    container_name: celonis_garage_db
+    environment:
+      - POSTGRES_USER=celonis
+      - POSTGRES_PASSWORD=garage
+      - POSTGRES_DB=logistics
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

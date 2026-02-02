@@ -1,0 +1,40 @@
+# Core Web Framework
+fastapi>=0.109.0
+uvicorn>=0.27.0
+
+# Data Processing
+pandas>=2.2.0
+numpy>=1.26.0
+
+# Configuration
+python-dotenv>=1.0.0
+pydantic>=2.6.0
+pydantic-settings>=2.1.0
+
+# LLM & Agent Framework
+openai>=1.12.0
+langchain>=0.1.0
+langchain-openai>=0.0.5
+langgraph>=0.2.0
+langgraph-checkpoint-postgres>=2.0.0
+tiktoken>=0.5.2
+
+# Database - Sync
+sqlalchemy>=2.0.41
+psycopg2-binary>=2.9.0
+
+# Database - Async (V2)
+asyncpg>=0.29.0
+
+# HTTP Client
+httpx>=0.26.0
+
+# Observability
+langfuse>=2.0.0
+structlog>=24.1.0
+
+# UI
+streamlit>=1.30.0
+
+# Debugging
+debugpy>=1.8.0
