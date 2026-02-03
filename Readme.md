@@ -22,12 +22,6 @@ A production-grade system that **proactively detects delivery delays** and **aut
 - 🔍 **Full Observability** — Langfuse tracing, structured logging, Postgres checkpointing
 - 🐳 **Cloud-Native** — Dockerized, Kubernetes-ready
 
-### Business Impact
-
-- **60% reduction** in customer support tickets through proactive outreach
-- **80% autonomous resolution** rate without human intervention
-- **90%+ detection accuracy** for at-risk shipments
-
 ---
 
 ## Quick Start
@@ -36,7 +30,6 @@ A production-grade system that **proactively detects delivery delays** and **aut
 
 - Docker Desktop (with Docker Compose)
 - OpenAI API key ([get one here](https://platform.openai.com/api-keys))
-- 8GB RAM minimum
 
 ### 1. Clone & Configure
 
@@ -223,8 +216,8 @@ result = run_supervisor(
 
 **Tables:**
 - `orders` — Business data (timestamps, regions, status, ticket flag)
-- `conversations` — Resolution sessions (1:N with orders)
-- `conversation_turns` — Turn-by-turn audit log (1:N with conversations)
+- `conversations` — Resolution sessions 
+- `conversation_turns` — Turn-by-turn audit log
 
 **PostgresManager API:**
 ```python
@@ -307,7 +300,7 @@ POSTGRES_DB=logistics
 AGENT_SUPERVISOR_MODEL=gpt-5.2       # Default
 AGENT_SPECIALIST_MODEL=gpt-5.1       # Default
 AGENT_MAX_TURNS=10                   # Max conversation turns
-AGENT_MAX_REFUND_PERCENT=20          # Max refund % of order cost
+
 
 # Observability (optional)
 LANGFUSE_SECRET_KEY=sk-lf-...
@@ -367,40 +360,69 @@ pytest tests/ -v
 
 ```
 ProactiveLogisticsAgent/
-├── data/                           # Datasets and stats
-│   ├── Celonis_Garage_Enriched_Data_Final.csv
-│   ├── route_stats.json
-│   ├── customer_stats.json
-│   └── policy.md
+├── data/                                    # Datasets and precomputed stats
+│   ├── Celonis_Garage_Enriched_Data_Final.csv  # LLM-enriched dataset (28 cols)
+│   ├── Original_data.csv                        # Kaggle source (12 cols)
+│   ├── route_stats.json                         # 75 route profiles
+│   ├── customer_stats.json                      # Behavior patterns
+│   ├── policy.md                                # Refund/reschedule policies
+│   └── README.md                                # Data documentation
 ├── src/
-│   ├── agent/                      # Multi-agent system
-│   │   ├── specialists/
-│   │   ├── supervisor.py
-│   │   └── state.py
-│   ├── api/                        # FastAPI endpoints
-│   │   └── main.py
-│   ├── contracts/                  # Pydantic models
-│   │   └── models.py
-│   ├── data_preprocessing/         # Stats generators
-│   │   ├── route_stats_generator.py
-│   │   └── customer_stats_generator.py
-│   ├── risk_detection/             # KPI engine
-│   │   ├── kpis.py
-│   │   └── risk_engine.py
-│   ├── storage_manager/            # Database layer
-│   │   ├── db_models.py
-│   │   └── postgres_manager.py
-│   ├── bootstrap.py                # Demo data seeder
-│   └── config.py                   # Configuration
-├── tests/                          # Unit & integration tests
-├── scripts/                        # Utility scripts
+│   ├── agent/                               # Multi-agent system (LangGraph)
+│   │   ├── specialists/                     # Specialist agent implementations
+│   │   │   ├── operations.py
+│   │   │   ├── customer.py
+│   │   │   └── resolution.py
+│   │   ├── supervisor.py                    # LLM-based routing supervisor
+│   │   ├── state.py                         # AgentState TypedDict
+│   │   ├── models.py                        # Pydantic models (RoutingDecision)
+│   │   ├── prompts.py                       # Agent system prompts
+│   │   ├── tools.py                         # Tool definitions & collections
+│   │   ├── retrieve.py                      # Context retrieval helpers
+│   │   └── __init__.py
+│   ├── api/                                 # FastAPI REST interface
+│   │   ├── main.py                          # Endpoints & startup logic
+│   │   └── __init__.py
+│   ├── contracts/                           # Shared Pydantic models
+│   │   ├── models.py                        # API request/response models
+│   │   └── __init__.py
+│   ├── data_preprocessing/                  # Offline data pipeline
+│   │   ├── route_stats_generator.py         # Generate route statistics
+│   │   ├── customer_stats_generator.py      # Generate customer patterns
+│   │   ├── enrichment_prompts.md            # LLM enrichment prompts
+│   │   ├── validate_enrichment.ipynb        # Data quality validation
+│   │   └── __init__.py
+│   ├── risk_detection/                      # KPI calculation & detection
+│   │   ├── kpis.py                          # 5 KPI implementations
+│   │   ├── risk_engine.py                   # Signal detection & priority
+│   │   ├── models.py                        # KPI result models
+│   │   └── __init__.py
+│   ├── storage_manager/                     # Database abstraction layer
+│   │   ├── postgres_manager.py              # PostgreSQL CRUD operations
+│   │   ├── db_models.py                     # SQLAlchemy models
+│   │   └── __init__.py
+│   ├── bootstrap.py                         # Demo data seeder (4 scenarios)
+│   └── config.py                            # Configuration & thresholds
+├── tests/
+│   ├── unit/                                # Component-level tests
+│   │   ├── test_kpis.py
+│   │   ├── test_agent_graph.py
+│   │   └── test_agent_state.py
+│   ├── integration/                         # End-to-end workflow tests
+│   │   └── test_scenarios.py
+│   ├── api/                                 # API endpoint tests
+│   │   └── test_endpoints.py
+│   └── conftest.py                          # Pytest fixtures
+├── scripts/
+│   ├── run_demo_scenarios.py                # Demo automation script
+│   └── dashboard.py                         # Streamlit monitoring UI
 ├── documentation/
-│   ├── Architecture.md             # Staff-level architecture doc
-│   └── Staff_Engineer_Challenge.txt
-├── docker-compose.yml
-├── Dockerfile
-├── requirements.txt
-└── README.md                       # This file
+│   ├── Architecture.md                      # Staff-level architecture doc
+├── docker-compose.yml                       # Docker services (web + db)
+├── Dockerfile                               # FastAPI container
+├── requirements.txt                         # Python dependencies
+├── .env.example                             # Environment template
+└── README.md                                # This file
 ```
 
 ---
@@ -481,43 +503,12 @@ SELECT * FROM conversations WHERE order_id = 1002;
 SELECT * FROM conversation_turns WHERE conversation_id = ...;
 ```
 
----
-
-## Production Deployment
-
-### Kubernetes
-
-See [`documentation/Architecture.md`](documentation/Architecture.md#deployment-setup) for:
-- Kubernetes manifests (Deployment, Service, HPA)
-- Database setup (RDS/Cloud SQL)
-- Secrets management (AWS Secrets Manager)
-- Monitoring (Prometheus + Grafana)
-- Alerting (PagerDuty integration)
-
-**Quick deploy:**
-```bash
-# Build and push image
-docker build -t your-registry/logistics-agent:v3.0.0 .
-docker push your-registry/logistics-agent:v3.0.0
-
-# Apply manifests
-kubectl apply -f k8s/
-```
-
-### Scaling Considerations
-
-| Component | Strategy | Limit |
-|-----------|----------|-------|
-| **API Pods** | HPA on CPU (70%) | 3-20 replicas |
-| **Database** | RDS Multi-AZ | 5000 writes/sec |
-| **LLM API** | OpenAI rate limits | 500 req/min |
-| **Cost** | $0.02/order | $600/mo at 1000 orders/day |
 
 ---
 
 ## Design Decisions
 
-### Why LangGraph over LangChain Agents?
+### LangGraph vs LangChain
 
 **LangGraph advantages:**
 - ✅ Explicit `AgentState` TypedDict (no hidden state)
@@ -527,7 +518,7 @@ kubectl apply -f k8s/
 
 **See:** [`documentation/Architecture.md#design-decisions`](documentation/Architecture.md#design-decisions)
 
-### Why Pydantic Structured Outputs?
+### Pydantic Structured Outputs
 
 **Problem:** String parsing from LLMs fails 20%+ of the time.
 
@@ -535,12 +526,12 @@ kubectl apply -f k8s/
 
 **Impact:** Parsing failures reduced to <1%.
 
-### Why File-Based Context (JSON/MD)?
+### File-Based Context (JSON/MD)
 
 - **LLM-friendly:** Direct text/JSON consumption
 - **Precomputed:** Stats generated once at startup
-- **Deterministic:** Same input → same output (testing)
-- **Simple:** No SQL in agent flow
+- **Small Context:** Small policy does not need RAG
+
 
 ### Full Design Rationale
 
@@ -593,55 +584,6 @@ This is rare with structured outputs. If it occurs:
 1. Check LLM model version (use gpt-5.2+)
 2. Review Langfuse traces for malformed responses
 3. Update Pydantic models to be more permissive
-
----
-
-## Contributing
-
-### Code Style
-
-- **Formatting:** Black (line length: 100)
-- **Linting:** Ruff
-- **Type hints:** Required for all public functions
-- **Docstrings:** Google style
-
-### Pull Request Process
-
-1. Fork repository and create feature branch
-2. Write tests for new functionality
-3. Ensure all tests pass: `pytest tests/ -v`
-4. Update relevant README files
-5. Submit PR with clear description
-
-### Adding a New KPI
-
-```python
-# 1. Define KPI class in src/risk_detection/kpis.py
-class MyNewKPI(KPI):
-    name = "my_kpi"
-    
-    def calculate(self, order: dict, context: dict) -> float:
-        # Your calculation logic
-        return value
-    
-    def is_breached(self, value: float, thresholds: dict, context: dict) -> BreachResult:
-        # Your threshold logic
-        return BreachResult(...)
-
-# 2. Register in ALL_KPIS list
-ALL_KPIS = [HubHoursKPI(), TransitHoursKPI(), ..., MyNewKPI()]
-
-# 3. Add threshold to src/config.py
-THRESHOLDS = {
-    "my_kpi": 100,  # Your threshold value
-}
-
-# 4. Write tests
-def test_my_new_kpi():
-    kpi = MyNewKPI()
-    value = kpi.calculate(test_order, context)
-    assert value == expected_value
-```
 
 ---
 
