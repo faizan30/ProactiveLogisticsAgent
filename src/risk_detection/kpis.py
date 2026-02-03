@@ -24,6 +24,19 @@ def get_severity(kpi_name: str) -> Severity:
 NO_DEADLINE_HOURS = 9999.0  # Value returned when order has no promised_date
 
 
+def parse_datetime(dt) -> datetime:
+    """Parse datetime from either datetime object or ISO string."""
+    if isinstance(dt, datetime):
+        return dt
+    if isinstance(dt, str):
+        # Handle ISO format strings with or without microseconds
+        try:
+            return datetime.fromisoformat(dt)
+        except:
+            return datetime.strptime(dt[:19], "%Y-%m-%dT%H:%M:%S")
+    return None
+
+
 def get_current_time() -> datetime:
     """
     Get current timestamp for KPI calculations.
@@ -57,8 +70,8 @@ class HubHoursKPI(KPI):
     
     def calculate(self, order: dict, context: Dict[str, Any]) -> float:
         now = context.get("now", get_current_time())
-        arrival = order.get("destination_arrival_date")
-        delivery = order.get("actual_delivery_date")
+        arrival = parse_datetime(order.get("destination_arrival_date"))
+        delivery = parse_datetime(order.get("actual_delivery_date"))
         
         if arrival and not delivery:
             hours = (now - arrival).total_seconds() / 3600
@@ -94,8 +107,8 @@ class TransitHoursKPI(KPI):
     def calculate(self, order: dict, context: Dict[str, Any]) -> float:
         """Calculate hours in transit (shipped but not arrived at hub)."""
         now = context.get("now", get_current_time())
-        ship_date = order.get("ship_date")
-        arrival = order.get("destination_arrival_date")
+        ship_date = parse_datetime(order.get("ship_date"))
+        arrival = parse_datetime(order.get("destination_arrival_date"))
         
         if ship_date and not arrival:
             hours = (now - ship_date).total_seconds() / 3600
@@ -140,7 +153,7 @@ class HoursRemainingKPI(KPI):
     
     def calculate(self, order: dict, context: Dict[str, Any]) -> float:
         now = context.get("now", get_current_time())
-        promised = order.get("promised_date")
+        promised = parse_datetime(order.get("promised_date"))
         
         if promised:
             hours = (promised - now).total_seconds() / 3600

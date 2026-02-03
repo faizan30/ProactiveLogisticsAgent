@@ -28,11 +28,11 @@ class PostgresManager:
                 return None
             return {
                 "id": order.id,
-                "order_date": order.order_date,
-                "promised_date": order.promised_date,
-                "ship_date": order.ship_date,
-                "destination_arrival_date": order.destination_arrival_date,
-                "actual_delivery_date": order.actual_delivery_date,
+                "order_date": order.order_date.isoformat() if order.order_date else None,
+                "promised_date": order.promised_date.isoformat() if order.promised_date else None,
+                "ship_date": order.ship_date.isoformat() if order.ship_date else None,
+                "destination_arrival_date": order.destination_arrival_date.isoformat() if order.destination_arrival_date else None,
+                "actual_delivery_date": order.actual_delivery_date.isoformat() if order.actual_delivery_date else None,
                 "origin_region": order.origin_region,
                 "destination_region": order.destination_region,
                 "mode_of_shipment": order.mode_of_shipment,
@@ -53,11 +53,11 @@ class PostgresManager:
             return [
                 {
                     "id": o.id,
-                    "order_date": o.order_date,
-                    "promised_date": o.promised_date,
-                    "ship_date": o.ship_date,
-                    "destination_arrival_date": o.destination_arrival_date,
-                    "actual_delivery_date": o.actual_delivery_date,
+                    "order_date": o.order_date.isoformat() if o.order_date else None,
+                    "promised_date": o.promised_date.isoformat() if o.promised_date else None,
+                    "ship_date": o.ship_date.isoformat() if o.ship_date else None,
+                    "destination_arrival_date": o.destination_arrival_date.isoformat() if o.destination_arrival_date else None,
+                    "actual_delivery_date": o.actual_delivery_date.isoformat() if o.actual_delivery_date else None,
                     "origin_region": o.origin_region,
                     "destination_region": o.destination_region,
                     "mode_of_shipment": o.mode_of_shipment,
