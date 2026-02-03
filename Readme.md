@@ -20,14 +20,13 @@ A production-grade system that **proactively detects delivery delays** and **aut
 - 📊 **Real-time KPI Monitoring** — Hub delays, transit time, deadline pressure, route risk
 - 💬 **Context-Aware Decisions** — Uses customer behavior, route statistics, and company policies
 - 🔍 **Full Observability** — Langfuse tracing, structured logging, Postgres checkpointing
-- 🐳 **Cloud-Native** — Dockerized, Kubernetes-ready, horizontally scalable
+- 🐳 **Cloud-Native** — Dockerized, Kubernetes-ready
 
 ### Business Impact
 
 - **60% reduction** in customer support tickets through proactive outreach
 - **80% autonomous resolution** rate without human intervention
 - **90%+ detection accuracy** for at-risk shipments
-- **$0.02 cost per resolution** (LLM + infrastructure)
 
 ---
 

@@ -78,38 +78,7 @@ This architecture demonstrates four core capabilities aligned with Celonis Garag
 
 ### 1. High-Level System Architecture
 
-```
-┌───────────────────────────────────────────────────────────────┐
-│                      CLIENT INTERFACES                        │
-│  REST API Clients  │  Streamlit Dashboard  │  CLI Scripts    │
-└───────────────────────────┬───────────────────────────────────┘
-                            │ HTTP/JSON
-┌───────────────────────────▼───────────────────────────────────┐
-│                   FastAPI Application Layer                   │
-│  ┌──────────────────────────────────────────────────────┐    │
-│  │  Endpoints: /bootstrap, /detect-deviation,           │    │
-│  │             /trigger-agent, /kpis, /view-response    │    │
-│  └────────────────────┬─────────────────┬───────────────┘    │
-│                       │                 │                     │
-│  ┌────────────────────▼──┐   ┌─────────▼─────────────────┐  │
-│  │   Risk Engine        │   │  Agent Supervisor         │  │
-│  │  - KPI calculation   │   │  - LangGraph StateGraph   │  │
-│  │  - Signal detection  │   │  - Multi-specialist routing│  │
-│  │  - Route analytics   │   │  - Postgres checkpointing │  │
-│  └──────────┬───────────┘   └──────────┬────────────────┘  │
-└─────────────┼──────────────────────────┼────────────────────┘
-              │                          │
-┌─────────────▼──────────────────────────▼────────────────────┐
-│                  Data & External Services                    │
-│  ┌──────────────┐  ┌────────────────┐  ┌────────────────┐  │
-│  │ PostgreSQL   │  │ File Context   │  │  OpenAI API    │  │
-│  │ - Orders     │  │ - route_stats  │  │  - gpt-5.2     │  │
-│  │ - Convos     │  │ - cust_stats   │  │  - gpt-5.1     │  │
-│  │ - Checkpoints│  │ - policy.md    │  │  - Structured  │  │
-│  └──────────────┘  └────────────────┘  │    outputs     │  │
-│                                        └────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
-```
+![High-Level Architecture](ARCHITECTURE.drawio.svg)
 
 *Stateless API pods with shared Postgres for horizontal scalability.*
 
@@ -117,60 +86,17 @@ This architecture demonstrates four core capabilities aligned with Celonis Garag
 
 ### 2. Multi-Agent AI Workflow
 
-```
-                POST /trigger-agent/{order_id}
-                           │
-              ┌────────────▼────────────┐
-              │  SUPERVISOR (gpt-5.2)  │  
-              │  - Analyzes risk signal │
-              │  - Routes to specialist │
-              │  - Evaluates progress   │
-              └────────┬────────────────┘
-                       │ Dynamic routing (LLM decision, not rules)
-       ┌───────────────┼───────────────┐
-       │               │               │
-  ┌────▼─────┐  ┌─────▼──────┐  ┌────▼──────┐
-  │Operations│  │  Customer  │  │Resolution │
-  │  Agent   │  │   Agent    │  │   Agent   │
-  ├──────────┤  ├────────────┤  ├───────────┤
-  │Research  │  │Draft msg   │  │Get policy │
-  │hub status│  │Refine tone │  │Process    │
-  │Get route │  │Send & get  │  │refund     │
-  │analytics │  │response    │  │Reschedule │
-  └────┬─────┘  └─────┬──────┘  └────┬──────┘
-       │              │              │
-       └──────────────┼──────────────┘
-                      │
-         ┌────────────▼────────────┐
-         │  LangGraph StateGraph  │
-         │  - TypedDict state     │
-         │  - Postgres checkpoint │
-         │  - Langfuse tracing    │
-         └────────────────────────┘
-```
+![Multi-Agent Workflow](Agent.drawio.svg)
 
 *LLM supervisor dynamically routes to specialists; Postgres checkpoints state after each node.*
 
 ---
 
-### 3. Data & Execution Flow
+### 3. Sequence Diagram
 
-**Offline Data Preparation:**
-```
-Kaggle CSV (12 cols) → Gemini Pro enrichment → Enhanced CSV (28 cols)
-                                                      │
-                                    ┌─────────────────┴─────────────────┐
-                                    ▼                                   ▼
-                            route_stats.json                   customer_stats.json
-                            (75 route profiles)                (5 rating tiers)
-```
+![Sequence Diagram](sequence.drawio.svg)
 
-**Runtime Workflow:**
-```
-POST /bootstrap → GET /kpis/{id} → POST /detect-deviation/{id} → POST /trigger-agent/{id} → GET /view-response/{id}
-```
-
-*CSV seed → KPI calculation → Risk signal → Agent resolution → Audit trail.*
+*End-to-end flow from risk detection to autonomous resolution.*
 
 ---
 
