@@ -170,7 +170,7 @@ def run_scenario(order_id: int, skip_agent: bool = False) -> dict:
     
     # Step 5: Trigger Agent (Real LLM calls)
     print("\n5️⃣  TRIGGER AGENT (POST /trigger-agent/{id})")
-    print("   🤖 Running multi-agent system (this may take 10-30s)...")
+    print("   🤖 Running multi-agent system (this may take 60-120s)...")
     start = time.time()
     agent_result = trigger_agent(order_id)
     elapsed = time.time() - start
