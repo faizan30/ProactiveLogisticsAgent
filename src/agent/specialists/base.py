@@ -51,7 +51,7 @@ def create_specialist_node(
         last_message = state["messages"][-1] if state["messages"] else None
         if not last_message:
             logger.warning(f"[{name.upper()}] No task message found")
-            return {"actions_taken": state["actions_taken"] + [f"{name}: No task provided"]}
+            return {"actions_taken": [f"{name}: No task provided"]}
         
         task = last_message.content if hasattr(last_message, 'content') else str(last_message)
         logger.info(f"[{name.upper()}] Task: {task[:100]}...")
@@ -107,11 +107,12 @@ Your task: {task}
             "message": final_response,
         }
         
+        # Note: actions_taken and conversation_turns use operator.add reducer
         return {
-            "actions_taken": state["actions_taken"] + [action_log],
+            "actions_taken": [action_log],
             "current_specialist": None,
             "messages": [AIMessage(content=f"[{name}] {final_response}")],
-            "conversation_turns": state["conversation_turns"] + [turn],
+            "conversation_turns": [turn],
         }
     
     return specialist_node

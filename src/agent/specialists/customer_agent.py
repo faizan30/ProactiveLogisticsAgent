@@ -258,11 +258,13 @@ def create_customer_agent():
         
         logger.info(f"[CUSTOMER] Completed. Customer chose: {result['customer_response']}")
         
+        # Note: actions_taken and conversation_turns use operator.add reducer
+        # So we only return the NEW items, not concatenated with existing
         return {
-            "actions_taken": state["actions_taken"] + [action_log],
+            "actions_taken": [action_log],
             "current_specialist": None,
             "messages": [AIMessage(content=f"[customer] {result['customer_response']}")],
-            "conversation_turns": state["conversation_turns"] + [turn],
+            "conversation_turns": [turn],
         }
     
     return customer_agent_node

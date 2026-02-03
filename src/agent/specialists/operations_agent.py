@@ -191,11 +191,12 @@ def create_operations_agent():
         
         logger.info(f"[OPERATIONS] Completed analysis")
         
+        # Note: actions_taken and conversation_turns use operator.add reducer
         return {
-            "actions_taken": state["actions_taken"] + [action_log],
+            "actions_taken": [action_log],
             "current_specialist": None,
             "messages": [AIMessage(content=f"[operations] {result['analysis']}")],
-            "conversation_turns": state["conversation_turns"] + [turn],
+            "conversation_turns": [turn],
         }
     
     return operations_agent_node

@@ -109,11 +109,12 @@ Execute now. Short reply only."""
             "message": final_response,
         }
         
+        # Note: actions_taken and conversation_turns use operator.add reducer
         return {
-            "actions_taken": state["actions_taken"] + [action_log],
+            "actions_taken": [action_log],
             "current_specialist": None,
             "messages": [AIMessage(content=f"[resolution] {final_response}")],
-            "conversation_turns": state["conversation_turns"] + [turn],
+            "conversation_turns": [turn],
         }
     
     return resolution_agent_node

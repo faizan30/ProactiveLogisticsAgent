@@ -73,14 +73,9 @@ def get_langfuse_handler(order_id: int, signal_type: str) -> LangfuseHandler | N
         return None
     
     try:
-        # LangfuseHandler for LangChain reads env vars automatically
-        # Set trace name via session_id and user_id for grouping
-        handler = LangfuseHandler(
-            session_id=f"order_{order_id}",
-            user_id=f"agent_{signal_type.lower()}",
-            tags=["logistics", "multi-agent", signal_type.lower()],
-            metadata={"order_id": order_id, "signal_type": signal_type},
-        )
+        # Langfuse 3.x API - reads env vars automatically
+        # No session_id param in new API, uses trace_context instead
+        handler = LangfuseHandler()
         
         logger.info(f"[LANGFUSE] Handler created for order #{order_id}")
         return handler
@@ -105,14 +100,25 @@ def get_checkpointer() -> PostgresSaver | None:
     
     try:
         from psycopg_pool import ConnectionPool
+        import psycopg
         
         conn_string = get_db_connection_string()
         
+        # First, run setup with autocommit connection (required for CREATE INDEX CONCURRENTLY)
+        try:
+            with psycopg.connect(conn_string, autocommit=True) as setup_conn:
+                temp_saver = PostgresSaver(setup_conn)
+                temp_saver.setup()
+            logger.info("[CHECKPOINTER] Tables created/verified")
+        except Exception as setup_err:
+            # Tables may already exist, continue
+            logger.debug(f"[CHECKPOINTER] Setup note: {setup_err}")
+        
+        # Now create the pool-based checkpointer for actual use
         if _checkpointer_pool is None:
             _checkpointer_pool = ConnectionPool(conninfo=conn_string, open=True)
         
         checkpointer = PostgresSaver(_checkpointer_pool)
-        checkpointer.setup()  # Ensure checkpoint tables exist
         return checkpointer
         
     except Exception as e:
@@ -209,6 +215,8 @@ Choose next_specialist: operations, customer, resolution, or finish"""
         HumanMessage(content=context),
     ]
     
+    is_fallback = False  # Track if we're using fallback routing
+    
     try:
         # Use structured output with retry
         decision = _invoke_supervisor_llm(llm, messages, config or {})
@@ -237,11 +245,12 @@ Choose next_specialist: operations, customer, resolution, or finish"""
         )
         
     except Exception as e:
-        # Error handling - track and fallback
+        # Error handling - track and fallback (don't log these as turns to reduce noise)
         error_count += 1
-        logger.error(
-            "supervisor_error",
-            extra={"order_id": state["order_id"], "error": str(e), "error_count": error_count}
+        is_fallback = True
+        logger.warning(
+            "supervisor_fallback",
+            extra={"order_id": state["order_id"], "error": str(e)[:50], "error_count": error_count}
         )
         
         # Fallback logic based on state
@@ -275,23 +284,26 @@ Choose next_specialist: operations, customer, resolution, or finish"""
             next_node = "customer"
         
         task = f"Handle order #{state['order_id']} - {state['signal_type']}"
-        reasoning = f"Fallback due to error: {str(e)[:50]}"
+        reasoning = f"Fallback routing to {next_node}"
     
     # Resolution text for finish
     resolution = "Resolved" if next_node == "finish" else state.get("resolution")
     
-    # Add supervisor turn to conversation
-    supervisor_turn = {
-        "role": "supervisor",
-        "action": f"delegate_to_{next_node}",
-        "message": reasoning[:500],
-    }
+    # Only log conversation turn for successful LLM decisions, not fallbacks
+    # This reduces noise from 429 rate limit retries
+    conversation_turns = []
+    if not is_fallback:
+        conversation_turns = [{
+            "role": "supervisor",
+            "action": f"delegate_to_{next_node}",
+            "message": reasoning[:500],
+        }]
     
     return {
         "current_specialist": next_node,
         "messages": [HumanMessage(content=task)],
         "resolution": resolution,
-        "conversation_turns": [supervisor_turn],
+        "conversation_turns": conversation_turns,
         "turn_count": turn_count,
         "error_count": error_count,
         "updated_at": datetime.utcnow().isoformat(),
@@ -429,10 +441,15 @@ def run_supervisor(
     
     # Run config
     callbacks = [langfuse_handler] if langfuse_handler else []
+    # Unique thread_id per run to prevent state accumulation from checkpointer
+    import uuid
+    run_id = uuid.uuid4().hex[:8]
     config = {
-        "configurable": {"thread_id": f"order_{order_id}_{signal_type}"},
+        "configurable": {"thread_id": f"order_{order_id}_{signal_type}_{run_id}"},
         "callbacks": callbacks,
-        "recursion_limit": 25,  # Allow enough turns for complex flows
+        "recursion_limit": 25,  # Allow enough turns for complex flows,
+        "run_name": order_id,
+        "run_id": order_id
     }
     
     # Execute graph
@@ -463,6 +480,6 @@ def run_supervisor(
             "conversation_turns": [],
         }
     finally:
-        # Flush Langfuse if configured
-        if langfuse_handler:
+        # Flush Langfuse if configured (new API uses langfuse_context)
+        if langfuse_handler and hasattr(langfuse_handler, 'flush'):
             langfuse_handler.flush()
