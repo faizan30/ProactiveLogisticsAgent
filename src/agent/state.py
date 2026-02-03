@@ -4,6 +4,7 @@ Shared State for Multi-Agent System
 Uses TypedDict for LangGraph state management.
 Postgres checkpointer persists state across runs.
 """
+import operator
 from typing import TypedDict, Annotated, Sequence, Literal
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
@@ -22,8 +23,8 @@ class AgentState(TypedDict):
     # Message history (with reducer for appending)
     messages: Annotated[Sequence[BaseMessage], add_messages]
     
-    # Tracking
-    actions_taken: list[str]  # Log of actions for supervisor context
+    # Tracking (with reducers for safe concurrent updates)
+    actions_taken: Annotated[list[str], operator.add]  # Log of actions
     current_specialist: str | None  # Which specialist is active
     turn_count: int  # Number of supervisor turns (for max_turns enforcement)
     
@@ -31,8 +32,8 @@ class AgentState(TypedDict):
     status: Literal["in_progress", "resolved", "failed"]
     resolution: str | None  # Final resolution summary
     
-    # Conversation turns for DB storage
-    conversation_turns: list[dict]
+    # Conversation turns for DB storage (with reducer)
+    conversation_turns: Annotated[list[dict], operator.add]
 
 
 def create_initial_state(order: dict, signal_type: str, signal_reason: str) -> AgentState:

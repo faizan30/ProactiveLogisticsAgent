@@ -16,6 +16,7 @@ from typing import Literal
 
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.postgres import PostgresSaver
 from langfuse.langchain import CallbackHandler as LangfuseHandler
@@ -44,7 +45,7 @@ logging.basicConfig(
 def get_langfuse_handler(order_id: int, signal_type: str) -> LangfuseHandler | None:
     """Create Langfuse callback handler for tracing.
     
-    Langfuse v3 reads credentials from environment:
+    Langfuse reads credentials from environment:
     - LANGFUSE_SECRET_KEY
     - LANGFUSE_PUBLIC_KEY  
     - LANGFUSE_HOST (optional)
@@ -57,28 +58,18 @@ def get_langfuse_handler(order_id: int, signal_type: str) -> LangfuseHandler | N
         return None
     
     try:
-        from langfuse import Langfuse
-        
-        # Initialize Langfuse client to create trace context
-        langfuse = Langfuse()
-        
-        # Create a trace for this resolution
-        trace = langfuse.trace(
-            name=f"resolve_{signal_type.lower()}_{order_id}",
+        # LangfuseHandler for LangChain reads env vars automatically
+        # Set trace name via session_id and user_id for grouping
+        handler = LangfuseHandler(
             session_id=f"order_{order_id}",
+            user_id=f"agent_{signal_type.lower()}",
             tags=["logistics", "multi-agent", signal_type.lower()],
             metadata={"order_id": order_id, "signal_type": signal_type},
         )
         
-        logger.info(f"[LANGFUSE] Trace created: {trace.id}")
+        logger.info(f"[LANGFUSE] Handler created for order #{order_id}")
+        return handler
         
-        # Return callback handler with trace context
-        return LangfuseHandler(
-            trace_context={
-                "trace_id": trace.id,
-                "observation_id": None,
-            }
-        )
     except Exception as e:
         logger.warning(f"[LANGFUSE] Failed to initialize: {e}")
         return None
@@ -86,15 +77,37 @@ def get_langfuse_handler(order_id: int, signal_type: str) -> LangfuseHandler | N
 
 # ==================== POSTGRES CHECKPOINTER ====================
 
-def get_checkpointer() -> PostgresSaver:
-    """Create Postgres checkpointer for state persistence."""
-    conn_string = get_db_connection_string()
-    return PostgresSaver.from_conn_string(conn_string)
+# Connection pool for checkpointer (module-level singleton)
+_checkpointer_pool = None
+
+def get_checkpointer() -> PostgresSaver | None:
+    """Create Postgres checkpointer for state persistence.
+    
+    Uses connection pool pattern required by langgraph-checkpoint-postgres 2.0+.
+    Returns None if connection fails.
+    """
+    global _checkpointer_pool
+    
+    try:
+        from psycopg_pool import ConnectionPool
+        
+        conn_string = get_db_connection_string()
+        
+        if _checkpointer_pool is None:
+            _checkpointer_pool = ConnectionPool(conninfo=conn_string, open=True)
+        
+        checkpointer = PostgresSaver(_checkpointer_pool)
+        checkpointer.setup()  # Ensure checkpoint tables exist
+        return checkpointer
+        
+    except Exception as e:
+        logger.warning(f"[CHECKPOINTER] Failed to create: {e}")
+        return None
 
 
 # ==================== SUPERVISOR NODE ====================
 
-def supervisor_node(state: AgentState, config: dict = None) -> dict:
+def supervisor_node(state: AgentState, config: RunnableConfig | None = None) -> dict:
     """
     Supervisor decides next action based on current state.
     
@@ -214,7 +227,7 @@ NEXT: FINISH
     }
 
 
-def finish_node(state: AgentState, config: dict = None) -> dict:
+def finish_node(state: AgentState, config: RunnableConfig | None = None) -> dict:
     """Mark resolution as complete."""
     logger.info(f"[SUPERVISOR] ✓ Resolution complete for order #{state['order_id']}")
     
@@ -326,12 +339,12 @@ def run_supervisor(
     
     # Compile with optional checkpointer
     if use_checkpointer:
-        try:
-            checkpointer = get_checkpointer()
+        checkpointer = get_checkpointer()
+        if checkpointer:
             graph = workflow.compile(checkpointer=checkpointer)
             logger.info("[SUPERVISOR] Using Postgres checkpointer")
-        except Exception as e:
-            logger.warning(f"[SUPERVISOR] Checkpointer failed, running without: {e}")
+        else:
+            logger.warning("[SUPERVISOR] Checkpointer unavailable, running without persistence")
             graph = workflow.compile()
     else:
         graph = workflow.compile()

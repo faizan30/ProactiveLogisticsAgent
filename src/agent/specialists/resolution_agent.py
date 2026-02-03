@@ -13,6 +13,7 @@ from typing import TypedDict
 
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
 from langgraph.prebuilt import create_react_agent
 
 from src.agent.state import AgentState
@@ -50,7 +51,7 @@ def create_resolution_agent():
     before executing any resolution actions.
     """
     
-    def resolution_agent_node(state: AgentState, config: dict = None) -> dict:
+    def resolution_agent_node(state: AgentState, config: RunnableConfig | None = None) -> dict:
         """Execute ResolutionAgent with policy validation."""
         logger.info(f"[RESOLUTION] Starting for order #{state['order_id']}")
         

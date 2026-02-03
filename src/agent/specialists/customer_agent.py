@@ -13,6 +13,7 @@ from typing import TypedDict, Annotated
 
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph, END
 
 from src.agent.state import AgentState
@@ -219,7 +220,7 @@ def create_customer_agent():
     # Pre-build and compile the internal graph
     internal_graph = build_customer_graph().compile()
     
-    def customer_agent_node(state: AgentState, config: dict = None) -> dict:
+    def customer_agent_node(state: AgentState, config: RunnableConfig | None = None) -> dict:
         """Execute CustomerAgent with internal sub-agents."""
         logger.info(f"[CUSTOMER] Starting for order #{state['order_id']}")
         

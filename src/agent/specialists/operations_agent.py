@@ -12,6 +12,7 @@ from typing import TypedDict
 
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import create_react_agent
 
@@ -154,7 +155,7 @@ def create_operations_agent():
     # Pre-build and compile the internal graph
     internal_graph = build_operations_graph().compile()
     
-    def operations_agent_node(state: AgentState, config: dict = None) -> dict:
+    def operations_agent_node(state: AgentState, config: RunnableConfig | None = None) -> dict:
         """Execute OperationsAgent with internal sub-agents."""
         logger.info(f"[OPERATIONS] Starting for order #{state['order_id']}")
         
