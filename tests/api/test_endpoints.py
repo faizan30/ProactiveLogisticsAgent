@@ -14,8 +14,11 @@ import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
 from datetime import datetime, timedelta
+import os
 
-from src.api.main import app, app_state
+# Set test environment before importing app
+os.environ["POSTGRES_HOST"] = "localhost"
+
 from src.contracts.models import SignalType, Severity
 
 
@@ -43,9 +46,9 @@ def mock_db():
         },
         1002: {
             "id": 1002,
-            "order_date": now - timedelta(days=6),
-            "promised_date": now + timedelta(days=1),
-            "ship_date": now - timedelta(days=4),
+            "order_date": now - timedelta(days=12),
+            "promised_date": now + timedelta(hours=12),  # < 48h = deadline pressure
+            "ship_date": now - timedelta(days=10),       # 240h in transit (exceeds 192h threshold)
             "destination_arrival_date": None,
             "actual_delivery_date": None,
             "origin_region": "West",
@@ -103,11 +106,18 @@ def client(mock_db):
     """Create test client with mocked dependencies."""
     from src.risk_detection.risk_engine import RiskEngine
     
-    app_state.db = mock_db
-    app_state.risk_engine = RiskEngine()
-    
-    with TestClient(app) as client:
-        yield client
+    # Patch PostgresManager to avoid DB connection during lifespan
+    with patch("src.api.main.PostgresManager") as MockPM:
+        MockPM.return_value = mock_db
+        
+        # Import app after patching
+        from src.api.main import app, app_state
+        
+        app_state.db = mock_db
+        app_state.risk_engine = RiskEngine()
+        
+        with TestClient(app) as test_client:
+            yield test_client
 
 
 class TestHealthEndpoint:

@@ -655,12 +655,6 @@ def test_my_new_kpi():
 
 ---
 
-## License
-
-[Your License Here]
-
----
-
 ## Acknowledgments
 
 **Challenge:** Celonis Garage Technical Challenge  
@@ -672,9 +666,9 @@ def test_my_new_kpi():
 
 ## Contact
 
-**Project Maintainer:** [Your Name]  
-**Email:** [your.email@company.com]  
-**Repository:** https://github.com/your-org/ProactiveLogisticsAgent
+**Project Maintainer:** [Faizan Khan]  
+**Email:** [fskofficial@gmail.com]  
+**Repository:** https://github.com/faizan30/ProactiveLogisticsAgent
 
 ---
 

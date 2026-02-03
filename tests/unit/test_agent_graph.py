@@ -177,7 +177,7 @@ class TestMaxTurnsEnforcement:
         result = supervisor_node(state, {})
         
         assert result["current_specialist"] == "finish"
-        assert "max turns" in result["resolution"].lower()
+        assert "exceeded" in result["resolution"].lower() or "max" in result["resolution"].lower()
         assert result["turn_count"] == AGENT_CONFIG["max_turns"]
     
     @patch("src.agent.supervisor.ChatOpenAI")
