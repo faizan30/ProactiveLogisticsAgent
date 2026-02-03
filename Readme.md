@@ -530,7 +530,7 @@ SELECT * FROM conversation_turns WHERE conversation_id = ...;
 
 - **LLM-friendly:** Direct text/JSON consumption
 - **Precomputed:** Stats generated once at startup
-- **Small Context:** Small policy does not need RAG
+- **Small Context:** Small policy document does not need RAG
 
 
 ### Full Design Rationale
