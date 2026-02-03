@@ -7,7 +7,7 @@ Provides validated data structures for:
 - Agent state schemas
 """
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Literal, Optional, Union
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -25,11 +25,19 @@ class OrderInput(BaseModel):
     ticket_raised: int = Field(ge=0, le=1, default=0, description="Whether ticket was raised")
     mocked_customer_response: str = Field(default="", description="Demo: expected customer response")
     
-    # Optional datetime fields
-    ship_date: Optional[str] = None
-    scheduled_delivery_date: Optional[str] = None
-    actual_delivery_date: Optional[str] = None
-    hub_entry_time: Optional[str] = None
+    # Optional datetime fields (can be datetime from DB or string)
+    ship_date: Optional[Union[str, datetime]] = None
+    scheduled_delivery_date: Optional[Union[str, datetime]] = None
+    actual_delivery_date: Optional[Union[str, datetime]] = None
+    hub_entry_time: Optional[Union[str, datetime]] = None
+    
+    @field_validator('ship_date', 'scheduled_delivery_date', 'actual_delivery_date', 'hub_entry_time', mode='before')
+    @classmethod
+    def convert_datetime_to_str(cls, v):
+        """Convert datetime objects to ISO strings for consistency."""
+        if isinstance(v, datetime):
+            return v.isoformat()
+        return v
     
     @field_validator('customer_rating')
     @classmethod

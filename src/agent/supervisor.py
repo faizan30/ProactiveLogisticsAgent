@@ -43,7 +43,7 @@ class RoutingDecision(BaseModel):
         description="Which specialist to delegate to, or 'finish' if resolved"
     )
     task_description: str = Field(description="Specific task for the specialist to execute")
-    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in this decision (0-1)")
+    confidence: float = Field(default=0.8, ge=0.0, le=1.0, description="Confidence in this decision (0-1)")
 
 logger = logging.getLogger("agent.supervisor")
 
@@ -149,40 +149,54 @@ def supervisor_node(state: AgentState, config: RunnableConfig | None = None) -> 
         extra={"order_id": state["order_id"], "turn": turn_count, "max_turns": max_turns}
     )
     
-    # Enforce max_turns limit
+    # Enforce max_turns limit - this is a FAILURE, agent couldn't resolve properly
     if turn_count >= max_turns:
-        logger.warning(
-            "max_turns_reached",
+        logger.error(
+            "max_turns_exceeded_failure",
             extra={"order_id": state["order_id"], "turn": turn_count}
         )
         return {
             "current_specialist": "finish",
+            "status": "failed",  # Explicit failure - couldn't reach proper resolution
             "turn_count": turn_count,
             "updated_at": datetime.utcnow().isoformat(),
-            "resolution": f"Max turns ({max_turns}) reached. Actions: {', '.join(state['actions_taken']) if state['actions_taken'] else 'none'}",
+            "resolution": f"Failed: Agent exceeded {max_turns} turns without resolution",
             "conversation_turns": [{
                 "role": "supervisor",
-                "action": "max_turns_reached",
-                "message": f"Stopping after {max_turns} turns",
+                "action": "max_turns_exceeded",
+                "message": f"FAILED: Could not resolve within {max_turns} turns",
             }],
         }
     
-    # Build context for supervisor (structured output needs clear instructions)
-    context = f"""Analyze this logistics issue and decide next action:
+    # Build context with clear action history analysis
+    actions = state['actions_taken'] or []
+    has_operations = any(a.lower().startswith('operations') for a in actions)
+    has_customer = any(a.lower().startswith('customer') for a in actions)
+    # Resolution must be an action BY resolution agent, not just mentioned in customer response
+    has_resolution = any(a.lower().startswith('resolution') for a in actions)
+    
+    # Determine what's done and what's next - be explicit about resolution requirement
+    if has_resolution:
+        status_hint = "✓ Resolution EXECUTED (refund/reschedule done). Choose 'finish'."
+    elif has_customer:
+        status_hint = "✓ Customer contacted. MUST choose 'resolution' to execute refund/reschedule. Do NOT skip to finish."
+    elif has_operations:
+        status_hint = "✓ Operations done. Choose 'customer' to get their preference."
+    else:
+        if state['signal_type'] == "STUCK_AT_HUB":
+            status_hint = "No actions yet. Choose 'operations' first."
+        else:
+            status_hint = "No actions yet. Choose 'customer' first."
+    
+    context = f"""Order #{state['order_id']} - {state['signal_type']}
+Reason: {state['signal_reason']}
 
-Order: #{state['order_id']}
-Signal: {state['signal_type']} - {state['signal_reason']}
-Route: {state['order'].get('origin_region')} → {state['order'].get('destination_region')}
-Customer: rating {state['order'].get('customer_rating')}/5, {state['order'].get('customer_care_calls')} care calls
-Demo preference: {state['mocked_customer_response']}
+Actions completed ({len(actions)}):
+{chr(10).join(f'- {a}' for a in actions[-3:]) if actions else '- None yet'}
 
-Actions completed: {state['actions_taken'] if state['actions_taken'] else 'None yet'}
+Status: {status_hint}
 
-Guidelines:
-- STUCK_AT_HUB: operations → customer → resolution
-- PREDICTED_DELAY: customer → resolution  
-- TICKET_RAISED: customer (empathy) → resolution (refund)
-- Use 'finish' only after resolution action is complete"""
+Choose next_specialist: operations, customer, resolution, or finish"""
     
     llm = ChatOpenAI(
         model=AGENT_CONFIG["supervisor_model"],
@@ -201,6 +215,16 @@ Guidelines:
         next_node = decision.next_specialist
         task = decision.task_description
         reasoning = decision.reasoning
+        
+        # HARD VALIDATION: Enforce workflow rules - LLM cannot skip resolution
+        if next_node == "finish" and not has_resolution:
+            logger.warning(
+                "workflow_override",
+                extra={"order_id": state["order_id"], "llm_choice": "finish", "override": "resolution"}
+            )
+            next_node = "resolution"
+            task = "Execute the customer's preferred resolution (refund or reschedule)"
+            reasoning = f"[Override] LLM chose finish but resolution not executed. Original: {reasoning[:50]}"
         
         logger.info(
             "routing_decision",
@@ -238,11 +262,15 @@ Guidelines:
                 }],
             }
         
-        # Simple fallback routing
-        if not state['actions_taken']:
-            next_node = "operations" if state['signal_type'] == "STUCK_AT_HUB" else "customer"
-        elif len(state['actions_taken']) >= 2:
+        # Deterministic fallback - use same logic as status_hint
+        if has_resolution:
+            next_node = "finish"
+        elif has_customer:
             next_node = "resolution"
+        elif has_operations:
+            next_node = "customer"
+        elif state['signal_type'] == "STUCK_AT_HUB":
+            next_node = "operations"
         else:
             next_node = "customer"
         
@@ -404,6 +432,7 @@ def run_supervisor(
     config = {
         "configurable": {"thread_id": f"order_{order_id}_{signal_type}"},
         "callbacks": callbacks,
+        "recursion_limit": 25,  # Allow enough turns for complex flows
     }
     
     # Execute graph
