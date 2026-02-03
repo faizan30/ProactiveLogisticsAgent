@@ -98,8 +98,9 @@ result = run_supervisor(
 src/agent/
 ├── __init__.py              # Exports run_supervisor
 ├── supervisor.py            # LangGraph graph + supervisor node
-├── state.py                 # AgentState TypedDict
-├── tools.py                 # Tools (8 tools)
+├── state.py                 # AgentState TypedDict with reducers
+├── models.py                # Pydantic models for validation + structured output
+├── tools.py                 # Tools (8 tools) with structured logging
 ├── prompts.py               # System prompts + sub-agent prompts
 ├── retrieve.py              # Simple file readers (policy.md, customer_stats.json)
 └── specialists/
@@ -162,65 +163,194 @@ Trace: resolve_stuck_at_hub_1003
 ## Design Decisions
 
 ### Why LangGraph?
-- **Explicit state** — TypedDict vs hidden state
-- **Native checkpointing** — Postgres support built-in
-- **Clear control flow** — Graph edges, not implicit chains
 
-### Why OpenAI?
-- **LangGraph ecosystem** — First-class support, fewer edge cases
-- **Tool calling** — Battle-tested function calling
-- **Langfuse integration** — Native callback support
+| Alternative | Why Not | LangGraph Advantage |
+|-------------|---------|---------------------|
+| LangChain Agents | Hidden state, hard to debug | Explicit `AgentState` TypedDict |
+| AutoGen | Complex setup, less control | Simple graph definition |
+| CrewAI | Opinionated, less flexible | Full control over routing |
+| Custom orchestration | Reinvent the wheel | Native checkpointing, callbacks |
 
-*Future: Benchmark Claude/Gemini for comparison*
+**Key LangGraph features used:**
+- `StateGraph` with typed nodes
+- `add_messages` reducer for message history
+- `operator.add` reducers for list fields (concurrent-safe)
+- Postgres checkpointer for state persistence
+- Conditional edges for dynamic routing
 
-### Why Mocked Tools?
-Demo scope. Real integrations (hub APIs, payment processors) would require credentials, error handling, and add flakiness. Tools are designed to be swappable.
+### Why Structured Output (Pydantic)?
 
-### Why Supervisor over Router?
-A hardcoded router (`if signal == X: return Y`) can't:
-- Handle compound signals
-- Adapt when specialist returns unexpected info
-- Demonstrate AI reasoning
+```python
+# ❌ Before: Fragile string parsing
+if "next: finish" in response.lower():
+    next_node = "finish"
 
-### Why File-Based Data (Not DB)?
-Tools read from JSON/markdown files in `data/`:
-- **Policy:** `data/policy.md` — ~2KB, fits in context
-- **Customer stats:** `data/customer_stats.json` — precomputed from CSV
-- **Route stats:** `data/route_stats.json` — precomputed from CSV
+# ✅ After: Typed, validated output
+class RoutingDecision(BaseModel):
+    next_specialist: Literal["operations", "customer", "resolution", "finish"]
+    reasoning: str
+    confidence: float
 
-This avoids DB complexity for demo. In production, swap file reads with Postgres queries.
-
-### Why Precomputed Stats?
-Following `route_stats.json` pattern:
-```bash
-# Generate stats from CSV
-python -m src.data_preprocessing.customer_stats_generator
-python -m src.data_preprocessing.route_stats_generator
+decision = llm.with_structured_output(RoutingDecision).invoke(messages)
 ```
 
-Tools just read the JSON — no complex logic, LLM processes the data.
+**Benefits:**
+- No parsing failures from LLM format drift
+- Validation at boundaries (fail fast)
+- IDE autocomplete and type checking
+- Self-documenting schemas
 
-### Why Binary Refund (Not Percentage)?
-Refund decision is yes/no. The LLM reads policy and decides whether to refund based on context. No percentage validation logic needed.
+### Why Supervisor over Router?
+
+A hardcoded router (`if signal == X: return Y`) can't:
+- Handle compound signals (stuck + ticket raised)
+- Adapt when specialist returns unexpected info
+- Demonstrate AI reasoning for reviewers
+
+The supervisor makes **visible decisions** with reasoning, which is valuable for:
+- Debugging agent behavior
+- Explaining actions to stakeholders
+- Training data for future improvements
+
+### Why Multi-Agent (Not Single Agent)?
+
+| Approach | Pros | Cons |
+|----------|------|------|
+| Single agent with all tools | Simple | Context pollution, role confusion |
+| **Multi-agent specialists** | Focused prompts, clear responsibilities | More complex orchestration |
+
+Each specialist has:
+- **Focused system prompt** — No role confusion
+- **Limited tools** — Only what it needs
+- **Clear success criteria** — Easy to evaluate
+
+### Why Mocked Tools?
+
+Demo scope. Real integrations would require:
+- API credentials and secrets management
+- Error handling for network failures
+- Rate limiting and retries
+- Test environment setup
+
+Tools are designed to be **swappable** — same interface, different implementation.
+
+### Why File-Based Data (Not DB)?
+
+| Data | File | Size | Rationale |
+|------|------|------|-----------|
+| Policy | `policy.md` | ~2KB | Fits in context, LLM processes |
+| Customer stats | `customer_stats.json` | ~1KB | Precomputed aggregates |
+| Route stats | `route_stats.json` | ~5KB | Precomputed per-route metrics |
+
+**Why precompute?**
+- Avoid complex SQL in agent flow
+- Deterministic results for testing
+- LLM processes the data, not code
+
+### Why Error State in AgentState?
+
+```python
+# Error tracking fields
+error: str | None           # What went wrong
+error_count: int            # For retry/circuit-breaker logic
+last_error_node: str | None # Which node failed
+```
+
+**Enables:**
+- Graceful degradation (fallback routing after N errors)
+- Debugging (which node failed?)
+- Metrics (error rate per node)
+
+### Why Timeout + Retry?
+
+```python
+llm = ChatOpenAI(timeout=30)  # Don't hang forever
+
+@retry(stop=stop_after_attempt(3), wait=wait_exponential())
+def _invoke_supervisor_llm(...):  # Retry transient failures
+```
+
+LLM APIs fail. Without these, one timeout = entire workflow failure.
 
 ---
 
-## Future Enhancements
+## Future Work
 
-### LiteLLM Integration
-- **Easy model swap** — Switch between OpenAI/Claude/Gemini without code changes
-- **Model routing** — Route requests to different models based on task complexity
-- **Fallback chains** — Auto-fallback to backup model on failures
-- **Rate limits** — Handle rate limiting with automatic retries
-- **Cost tracking** — Monitor token usage and costs per model
+### Production Readiness
 
-### Model Testing
-- **Latency benchmarks** — Compare response times across providers
-- **Accuracy evaluation** — Test resolution quality per model
-- **Cost-performance tradeoffs** — Find optimal model for each agent role
+| Feature | Current | Future |
+|---------|---------|--------|
+| **Checkpointing** | Postgres (implemented) | Add Redis for speed |
+| **Observability** | Langfuse callbacks | Add Prometheus metrics |
+| **Error handling** | Basic retry | Circuit breaker pattern |
+| **Testing** | Unit tests | Integration tests with LLM mocks |
 
-### Other
-- **Real integrations** — Connect to actual hub APIs, payment systems
-- **HITL mode** — Human approval for high-value refunds
-- **Streaming** — Real-time agent responses
-- **Escalation routing** — Route to human for unresolvable cases
+### Model Flexibility
+
+**LiteLLM Integration:**
+```python
+# Future: Easy model swap
+from litellm import completion
+response = completion(
+    model="gpt-4",  # or "claude-3", "gemini-pro"
+    messages=messages,
+    fallbacks=["claude-3-sonnet", "gpt-3.5-turbo"],
+)
+```
+
+**Benefits:**
+- A/B test models per agent role
+- Auto-fallback on provider outages
+- Cost optimization (cheaper models for simple tasks)
+
+### Long-Term Memory
+
+**Not implemented for demo simplicity, but designed for:**
+```python
+# LangGraph Store API (standard pattern)
+from langgraph.store.memory import InMemoryStore
+
+store = InMemoryStore(index={"embed": embed_fn, "dims": 1536})
+store.put(namespace=("resolutions",), key="order_123", value={...})
+similar = store.search(namespace, query="stuck at hub")
+```
+
+**Use cases:**
+- Remember past resolutions for similar cases
+- Learn customer preferences across sessions
+- Build procedural memory (learned rules)
+
+### Human-in-the-Loop
+
+```python
+# Future: Approval gates
+if refund_amount > config.auto_approve_limit:
+    return {"status": "pending_approval", "awaiting": "human"}
+```
+
+### Real Integrations
+
+| Tool | Current | Production |
+|------|---------|------------|
+| `contact_hub` | Mocked response | Hub API call |
+| `process_refund` | Mocked | Payment processor API |
+| `send_message` | Mocked | Email/SMS service |
+
+### Streaming Responses
+
+```python
+# Future: Real-time updates to UI
+async for chunk in graph.astream(state):
+    yield {"event": "agent_update", "data": chunk}
+```
+
+---
+
+## Architecture Principles
+
+1. **Fail fast** — Validate inputs at boundaries with Pydantic
+2. **Explicit state** — No hidden state, everything in `AgentState`
+3. **Structured outputs** — Pydantic models, not string parsing
+4. **Graceful degradation** — Fallbacks when LLM fails
+5. **Observable** — Structured logging, Langfuse traces
+6. **Testable** — Mocked tools, deterministic state transitions

@@ -9,17 +9,44 @@ Tool Categories:
 - OPERATIONS_TOOLS: Hub, shipment, customer stats
 - CUSTOMER_TOOLS: Customer communication
 - RESOLUTION_TOOLS: Action execution
+
+Includes retry logic and structured logging for production readiness.
 """
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import Annotated
+from functools import wraps
+from typing import Annotated, Callable
 
 from langchain_core.tools import tool
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from src.agent.retrieve import get_policy as _get_policy, get_customer_stats as _get_customer_stats
 
 logger = logging.getLogger("agent.tools")
+
+
+# ==================== RETRY DECORATOR ====================
+
+def with_retry(func: Callable) -> Callable:
+    """Wrap tool function with retry logic for transient failures."""
+    @wraps(func)
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=0.5, min=0.5, max=5),
+        retry=retry_if_exception_type((ConnectionError, TimeoutError, IOError)),
+    )
+    def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+    return wrapper
+
+
+def log_tool_call(tool_name: str, **params):
+    """Structured logging for tool calls."""
+    logger.info(
+        "tool_invoked",
+        extra={"tool": tool_name, "params": params, "timestamp": datetime.utcnow().isoformat()}
+    )
 
 
 # ==================== POLICY TOOL ====================
@@ -31,7 +58,7 @@ def get_policy() -> str:
     
     Returns the full policy document for LLM to process.
     """
-    logger.info("[TOOL] get_policy called")
+    log_tool_call("get_policy")
     return _get_policy()
 
 
@@ -45,25 +72,26 @@ def get_customer_stats(customer_rating: Annotated[int, "Customer rating 1-5"]) -
     Returns avg_care_calls, complaint_rate, avg_prior_purchases.
     Useful for understanding customer behavior patterns.
     """
-    logger.info(f"[TOOL] get_customer_stats for rating {customer_rating}")
+    log_tool_call("get_customer_stats", customer_rating=customer_rating)
     stats = _get_customer_stats()
     rating_stats = stats.get(str(customer_rating), {})
     if rating_stats:
         return f"Customer stats for rating {customer_rating}: {json.dumps(rating_stats)}"
     return f"No stats found for rating {customer_rating}"
 
+
 @tool
 def contact_hub(order_id: Annotated[int, "The order ID to check"]) -> str:
     """Contact the destination hub to check package status."""
-    logger.info(f"[TOOL] contact_hub called for order {order_id}")
-    # Mocked response - in production would call hub API
+    log_tool_call("contact_hub", order_id=order_id)
+    # Mocked response - in production would call hub API with retry
     return f"Hub response: Package for order #{order_id} is located and ready for dispatch. No issues found."
 
 
 @tool
 def check_shipment_status(order_id: Annotated[int, "The order ID to check"]) -> str:
     """Check current shipment tracking status."""
-    logger.info(f"[TOOL] check_shipment_status called for order {order_id}")
+    log_tool_call("check_shipment_status", order_id=order_id)
     # Mocked response
     return f"Shipment #{order_id}: Currently at destination hub. Last scan: 2 hours ago."
 
@@ -76,8 +104,8 @@ def send_message(
     message: Annotated[str, "Message to send to customer"]
 ) -> str:
     """Send a message to the customer."""
-    logger.info(f"[TOOL] send_message to customer for order {order_id}: {message[:50]}...")
-    # In production would send email/SMS
+    log_tool_call("send_message", order_id=order_id, message_length=len(message))
+    # In production would send email/SMS with retry
     return f"Message sent to customer for order #{order_id}"
 
 
@@ -87,7 +115,7 @@ def get_customer_response(
     mocked_response: Annotated[str, "The mocked customer response from order data"]
 ) -> str:
     """Get customer's response to our message (mocked for demo)."""
-    logger.info(f"[TOOL] get_customer_response for order {order_id}: {mocked_response}")
+    log_tool_call("get_customer_response", order_id=order_id, mocked_response=mocked_response)
     # Returns the mocked response from order data
     if mocked_response == "refund":
         return "Customer response: I would like a refund please."
@@ -102,8 +130,8 @@ def get_customer_response(
 @tool
 def process_refund(order_id: Annotated[int, "The order ID"]) -> str:
     """Process a full refund for the customer."""
-    logger.info(f"[TOOL] process_refund for order {order_id}")
-    # Mocked - in production would call payment system
+    log_tool_call("process_refund", order_id=order_id)
+    # Mocked - in production would call payment system with retry
     return f"Refund processed for order #{order_id}. Full refund issued. Confirmation sent to customer."
 
 
@@ -113,7 +141,7 @@ def reschedule_delivery(
     new_date: Annotated[str, "New delivery date (or 'tomorrow')"]
 ) -> str:
     """Reschedule delivery to a new date."""
-    logger.info(f"[TOOL] reschedule_delivery for order {order_id} to {new_date}")
+    log_tool_call("reschedule_delivery", order_id=order_id, new_date=new_date)
     if new_date.lower() == "tomorrow":
         new_date = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
     # Mocked
@@ -126,7 +154,7 @@ def close_ticket(
     resolution: Annotated[str, "Resolution summary"]
 ) -> str:
     """Close the support ticket with resolution."""
-    logger.info(f"[TOOL] close_ticket for order {order_id}: {resolution}")
+    log_tool_call("close_ticket", order_id=order_id, resolution=resolution[:50])
     return f"Ticket closed for order #{order_id}. Resolution: {resolution}"
 
 

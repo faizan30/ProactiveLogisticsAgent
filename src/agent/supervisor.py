@@ -12,14 +12,17 @@ Uses Langfuse callbacks for observability.
 """
 import os
 import logging
+from datetime import datetime
 from typing import Literal
 
+from pydantic import BaseModel, Field
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.postgres import PostgresSaver
 from langfuse.langchain import CallbackHandler as LangfuseHandler
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
 from src.agent.state import AgentState, create_initial_state
 from src.agent.prompts import SUPERVISOR_SYSTEM_PROMPT
@@ -29,6 +32,18 @@ from src.agent.specialists import (
     create_resolution_agent,
 )
 from src.config import get_db_connection_string, AGENT_CONFIG
+
+
+# ==================== STRUCTURED OUTPUT MODELS ====================
+
+class RoutingDecision(BaseModel):
+    """Structured output for supervisor routing decisions."""
+    reasoning: str = Field(description="Brief explanation of why this specialist was chosen")
+    next_specialist: Literal["operations", "customer", "resolution", "finish"] = Field(
+        description="Which specialist to delegate to, or 'finish' if resolved"
+    )
+    task_description: str = Field(description="Specific task for the specialist to execute")
+    confidence: float = Field(ge=0.0, le=1.0, description="Confidence in this decision (0-1)")
 
 logger = logging.getLogger("agent.supervisor")
 
@@ -107,56 +122,72 @@ def get_checkpointer() -> PostgresSaver | None:
 
 # ==================== SUPERVISOR NODE ====================
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=10),
+    retry=retry_if_exception_type((TimeoutError, ConnectionError)),
+)
+def _invoke_supervisor_llm(llm, messages: list, config: dict) -> RoutingDecision:
+    """Invoke LLM with structured output and retry logic."""
+    structured_llm = llm.with_structured_output(RoutingDecision)
+    return structured_llm.invoke(messages, config=config)
+
+
 def supervisor_node(state: AgentState, config: RunnableConfig | None = None) -> dict:
     """
     Supervisor decides next action based on current state.
     
-    Returns routing decision: OPERATIONS, CUSTOMER, RESOLUTION, or FINISH
+    Uses structured output for reliable routing decisions.
     Enforces max_turns limit from AGENT_CONFIG.
     """
     turn_count = state.get("turn_count", 0) + 1
     max_turns = AGENT_CONFIG["max_turns"]
+    error_count = state.get("error_count", 0)
     
-    logger.info(f"[SUPERVISOR] Turn {turn_count}/{max_turns} for order #{state['order_id']}")
+    logger.info(
+        "supervisor_turn",
+        extra={"order_id": state["order_id"], "turn": turn_count, "max_turns": max_turns}
+    )
     
     # Enforce max_turns limit
     if turn_count >= max_turns:
-        logger.warning(f"[SUPERVISOR] Max turns ({max_turns}) reached, forcing finish")
+        logger.warning(
+            "max_turns_reached",
+            extra={"order_id": state["order_id"], "turn": turn_count}
+        )
         return {
             "current_specialist": "finish",
             "turn_count": turn_count,
-            "resolution": f"Resolution stopped: max turns ({max_turns}) reached. Actions taken: {', '.join(state['actions_taken']) if state['actions_taken'] else 'none'}",
-            "conversation_turns": state["conversation_turns"] + [{
+            "updated_at": datetime.utcnow().isoformat(),
+            "resolution": f"Max turns ({max_turns}) reached. Actions: {', '.join(state['actions_taken']) if state['actions_taken'] else 'none'}",
+            "conversation_turns": [{
                 "role": "supervisor",
                 "action": "max_turns_reached",
                 "message": f"Stopping after {max_turns} turns",
             }],
         }
     
-    # Build context for supervisor
-    context = f"""
-Current situation:
-- Order: #{state['order_id']}
-- Signal: {state['signal_type']} - {state['signal_reason']}
-- Route: {state['order'].get('origin_region')} → {state['order'].get('destination_region')}
-- Customer rating: {state['order'].get('customer_rating')}/5
-- Care calls: {state['order'].get('customer_care_calls')}
-- Mocked customer preference (for demo): {state['mocked_customer_response']}
+    # Build context for supervisor (structured output needs clear instructions)
+    context = f"""Analyze this logistics issue and decide next action:
 
-Actions taken so far:
-{chr(10).join(f"- {a}" for a in state['actions_taken']) if state['actions_taken'] else "None yet"}
+Order: #{state['order_id']}
+Signal: {state['signal_type']} - {state['signal_reason']}
+Route: {state['order'].get('origin_region')} → {state['order'].get('destination_region')}
+Customer: rating {state['order'].get('customer_rating')}/5, {state['order'].get('customer_care_calls')} care calls
+Demo preference: {state['mocked_customer_response']}
 
-Decide: Which specialist should act next, or is this resolved?
-Respond with your reasoning, then on the last line write exactly one of:
-NEXT: OPERATIONS
-NEXT: CUSTOMER  
-NEXT: RESOLUTION
-NEXT: FINISH
-"""
+Actions completed: {state['actions_taken'] if state['actions_taken'] else 'None yet'}
+
+Guidelines:
+- STUCK_AT_HUB: operations → customer → resolution
+- PREDICTED_DELAY: customer → resolution  
+- TICKET_RAISED: customer (empathy) → resolution (refund)
+- Use 'finish' only after resolution action is complete"""
     
     llm = ChatOpenAI(
         model=AGENT_CONFIG["supervisor_model"],
         temperature=AGENT_CONFIG["supervisor_temperature"],
+        timeout=30,  # P0: Timeout handling
     )
     
     messages = [
@@ -164,72 +195,87 @@ NEXT: FINISH
         HumanMessage(content=context),
     ]
     
-    response = llm.invoke(messages, config=config or {})
-    response_text = response.content
-    
-    logger.info(f"[SUPERVISOR] Thinking: {response_text[:200]}...")
-    
-    # Parse the routing decision
-    response_lower = response_text.lower()
-    if "next: finish" in response_lower or "finish" in response_lower.split('\n')[-1]:
-        next_node = "finish"
-        # Simple short resolution for DB (VARCHAR 20 in existing schema)
-        resolution = "Resolved"
-    elif "next: operations" in response_lower:
-        next_node = "operations"
-        resolution = None
-    elif "next: customer" in response_lower:
-        next_node = "customer"
-        resolution = None
-    elif "next: resolution" in response_lower:
-        next_node = "resolution"
-        resolution = None
-    else:
-        # Default to finish if unclear after multiple actions
-        if len(state['actions_taken']) >= 3:
-            next_node = "finish"
-            resolution = "Resolution completed based on actions taken."
+    try:
+        # Use structured output with retry
+        decision = _invoke_supervisor_llm(llm, messages, config or {})
+        next_node = decision.next_specialist
+        task = decision.task_description
+        reasoning = decision.reasoning
+        
+        logger.info(
+            "routing_decision",
+            extra={
+                "order_id": state["order_id"],
+                "next": next_node,
+                "confidence": decision.confidence,
+                "reasoning": reasoning[:100],
+            }
+        )
+        
+    except Exception as e:
+        # Error handling - track and fallback
+        error_count += 1
+        logger.error(
+            "supervisor_error",
+            extra={"order_id": state["order_id"], "error": str(e), "error_count": error_count}
+        )
+        
+        # Fallback logic based on state
+        if error_count >= 3:
+            return {
+                "current_specialist": "finish",
+                "turn_count": turn_count,
+                "error": str(e),
+                "error_count": error_count,
+                "last_error_node": "supervisor",
+                "status": "error",
+                "updated_at": datetime.utcnow().isoformat(),
+                "resolution": f"Error after {error_count} attempts: {str(e)[:100]}",
+                "conversation_turns": [{
+                    "role": "supervisor",
+                    "action": "error",
+                    "message": f"Failed after {error_count} attempts",
+                }],
+            }
+        
+        # Simple fallback routing
+        if not state['actions_taken']:
+            next_node = "operations" if state['signal_type'] == "STUCK_AT_HUB" else "customer"
+        elif len(state['actions_taken']) >= 2:
+            next_node = "resolution"
         else:
-            # Try to infer from signal type
-            if state['signal_type'] == "STUCK_AT_HUB" and not state['actions_taken']:
-                next_node = "operations"
-            elif not state['actions_taken']:
-                next_node = "customer"
-            else:
-                next_node = "resolution"
-            resolution = None
+            next_node = "customer"
+        
+        task = f"Handle order #{state['order_id']} - {state['signal_type']}"
+        reasoning = f"Fallback due to error: {str(e)[:50]}"
     
-    logger.info(f"[SUPERVISOR] Decision: → {next_node.upper()}")
-    
-    # Create task message for the specialist
-    task_messages = {
-        "operations": f"Check the hub status for order #{state['order_id']}. Contact the hub and report back.",
-        "customer": f"Contact the customer about order #{state['order_id']}. Signal: {state['signal_type']}. Previous actions: {state['actions_taken']}. Offer appropriate resolution (refund/reschedule). Their mocked response will be: {state['mocked_customer_response']}",
-        "resolution": f"Execute resolution for order #{state['order_id']}. Customer preference: {state['mocked_customer_response']}. Process the appropriate action.",
-        "finish": "Resolution complete.",
-    }
-    
-    task = task_messages.get(next_node, "Continue resolution.")
+    # Resolution text for finish
+    resolution = "Resolved" if next_node == "finish" else state.get("resolution")
     
     # Add supervisor turn to conversation
     supervisor_turn = {
         "role": "supervisor",
         "action": f"delegate_to_{next_node}",
-        "message": response_text[:500],
+        "message": reasoning[:500],
     }
     
     return {
         "current_specialist": next_node,
         "messages": [HumanMessage(content=task)],
-        "resolution": resolution if next_node == "finish" else state.get("resolution"),
-        "conversation_turns": state["conversation_turns"] + [supervisor_turn],
+        "resolution": resolution,
+        "conversation_turns": [supervisor_turn],
         "turn_count": turn_count,
+        "error_count": error_count,
+        "updated_at": datetime.utcnow().isoformat(),
     }
 
 
 def finish_node(state: AgentState, config: RunnableConfig | None = None) -> dict:
     """Mark resolution as complete."""
-    logger.info(f"[SUPERVISOR] ✓ Resolution complete for order #{state['order_id']}")
+    logger.info(
+        "resolution_complete",
+        extra={"order_id": state["order_id"], "actions_count": len(state.get("actions_taken", []))}
+    )
     
     # Truncate resolution to fit DB (max 200 chars)
     resolution_summary = (state.get("resolution") or "Issue resolved successfully.")[:200]
@@ -245,7 +291,8 @@ def finish_node(state: AgentState, config: RunnableConfig | None = None) -> dict
         "status": "resolved",
         "resolution": resolution_summary,
         "current_specialist": None,
-        "conversation_turns": state["conversation_turns"] + [final_turn],
+        "conversation_turns": [final_turn],
+        "updated_at": datetime.utcnow().isoformat(),
     }
 
 
