@@ -62,15 +62,15 @@ docker-compose logs -f web
 The dashboard starts automatically with the container at **http://localhost:8501**
 
 1. Click **Bootstrap Data** to seed demo scenarios
-2. Select a scenario (901-904) to test
+2. Select a scenario (1001-1004) to test
 3. Walk through: **Order → KPIs → Detect → Agent → Response**
 
 | Order | Scenario | Expected Flow |
 |-------|----------|---------------|
-| 901 | ✅ Happy Path | No risk detected |
-| 902 | ⚠️ Predicted Delay | Email → Refund |
-| 903 | 📦 Warehouse Stagnation | Ping ops → Reschedule |
-| 904 | 👻 Ghost Delivery | Ping manager → Reschedule |
+| 1001 | ✅ Happy Path | No risk detected |
+| 1002 | ⚠️ Predicted Delay | Email → Refund |
+| 1003 | 📦 Warehouse Stagnation | Ping ops → Reschedule |
+| 1004 | 👻 Ghost Delivery | Ping manager → Reschedule |
 
 #### Option B: API via curl
 
@@ -387,57 +387,66 @@ ProactiveLogisticsAgent/
 ├── src/
 │   ├── agent/                               # Multi-agent system (LangGraph)
 │   │   ├── specialists/                     # Specialist agent implementations
-│   │   │   ├── operations.py
-│   │   │   ├── customer.py
-│   │   │   └── resolution.py
-│   │   ├── supervisor.py                    # LLM-based routing supervisor
-│   │   ├── state.py                         # AgentState TypedDict
+│   │   │   ├── __init__.py                  # Exports create_* functions
+│   │   │   ├── base.py                      # BaseSpecialist abstract class
+│   │   │   ├── customer_agent.py            # CustomerAgent - comms & sentiment
+│   │   │   ├── operations_agent.py          # OperationsAgent - hub/logistics
+│   │   │   └── resolution_agent.py          # ResolutionAgent - refunds/reschedules
+│   │   ├── __init__.py                      # Exports run_supervisor
+│   │   ├── log_capture.py                   # Real-time log streaming to dashboard
 │   │   ├── models.py                        # Pydantic models (RoutingDecision)
 │   │   ├── prompts.py                       # Agent system prompts
-│   │   ├── tools.py                         # Tool definitions & collections
 │   │   ├── retrieve.py                      # Context retrieval helpers
-│   │   └── __init__.py
+│   │   ├── state.py                         # AgentState TypedDict
+│   │   ├── supervisor.py                    # LLM-based routing supervisor
+│   │   ├── tools.py                         # Tool definitions & collections
+│   │   └── README.md                        # Agent architecture documentation
 │   ├── api/                                 # FastAPI REST interface
-│   │   ├── main.py                          # Endpoints & startup logic
-│   │   └── __init__.py
+│   │   ├── __init__.py
+│   │   └── main.py                          # Endpoints & startup logic
 │   ├── contracts/                           # Shared Pydantic models
-│   │   ├── models.py                        # API request/response models
-│   │   └── __init__.py
+│   │   ├── __init__.py
+│   │   └── models.py                        # API request/response models
 │   ├── data_preprocessing/                  # Offline data pipeline
-│   │   ├── route_stats_generator.py         # Generate route statistics
+│   │   ├── __init__.py
 │   │   ├── customer_stats_generator.py      # Generate customer patterns
 │   │   ├── enrichment_prompts.md            # LLM enrichment prompts
-│   │   ├── validate_enrichment.ipynb        # Data quality validation
-│   │   └── __init__.py
+│   │   ├── route_stats_generator.py         # Generate route statistics
+│   │   └── validate_enrichment.ipynb        # Data quality validation
 │   ├── risk_detection/                      # KPI calculation & detection
+│   │   ├── __init__.py
 │   │   ├── kpis.py                          # 5 KPI implementations
-│   │   ├── risk_engine.py                   # Signal detection & priority
 │   │   ├── models.py                        # KPI result models
-│   │   └── __init__.py
+│   │   ├── risk_engine.py                   # Signal detection & priority
+│   │   └── README.md                        # Risk detection documentation
 │   ├── storage_manager/                     # Database abstraction layer
-│   │   ├── postgres_manager.py              # PostgreSQL CRUD operations
+│   │   ├── __init__.py
 │   │   ├── db_models.py                     # SQLAlchemy models
-│   │   └── __init__.py
+│   │   └── postgres_manager.py              # PostgreSQL CRUD operations
 │   ├── bootstrap.py                         # Demo data seeder (4 scenarios)
 │   └── config.py                            # Configuration & thresholds
 ├── tests/
 │   ├── unit/                                # Component-level tests
-│   │   ├── test_kpis.py
-│   │   ├── test_agent_graph.py
-│   │   └── test_agent_state.py
+│   │   ├── test_agent_graph.py              # Graph construction tests
+│   │   ├── test_agent_state.py              # State management tests
+│   │   ├── test_agent_tools.py              # Tool execution tests
+│   │   ├── test_kpis.py                     # KPI calculation tests
+│   │   └── test_risk_engine.py              # Risk detection tests
 │   ├── integration/                         # End-to-end workflow tests
-│   │   └── test_scenarios.py
+│   │   └── test_scenarios.py                # Full scenario tests
 │   ├── api/                                 # API endpoint tests
-│   │   └── test_endpoints.py
+│   │   └── test_endpoints.py                # REST API tests
 │   └── conftest.py                          # Pytest fixtures
 ├── scripts/
+│   ├── dashboard.py                         # Streamlit monitoring UI
 │   ├── run_demo_scenarios.py                # Demo automation script
-│   └── dashboard.py                         # Streamlit monitoring UI
+│   └── start.sh                             # Container startup script
 ├── documentation/
-│   ├── Architecture.md                      # Staff-level architecture doc
+│   └── Architecture.md                      # Staff-level architecture doc
 ├── docker-compose.yml                       # Docker services (web + db)
 ├── Dockerfile                               # FastAPI container
 ├── requirements.txt                         # Python dependencies
+├── pytest.ini                               # Pytest configuration
 ├── .env.example                             # Environment template
 └── README.md                                # This file
 ```
