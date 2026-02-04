@@ -57,6 +57,23 @@ docker-compose logs -f web
 
 ### 3. Run Demo Workflow
 
+#### Option A: Streamlit Dashboard (Recommended)
+
+The dashboard starts automatically with the container at **http://localhost:8501**
+
+1. Click **Bootstrap Data** to seed demo scenarios
+2. Select a scenario (901-904) to test
+3. Walk through: **Order → KPIs → Detect → Agent → Response**
+
+| Order | Scenario | Expected Flow |
+|-------|----------|---------------|
+| 901 | ✅ Happy Path | No risk detected |
+| 902 | ⚠️ Predicted Delay | Email → Refund |
+| 903 | 📦 Warehouse Stagnation | Ping ops → Reschedule |
+| 904 | 👻 Ghost Delivery | Ping manager → Reschedule |
+
+#### Option B: API via curl
+
 ```bash
 # Seed 4 demo orders
 curl -X POST http://localhost:9001/bootstrap

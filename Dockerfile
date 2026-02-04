@@ -17,8 +17,8 @@ COPY data/Celonis_Garage_Enriched_Data_Final.csv ./data/
 COPY data/route_stats.json ./data/
 COPY scripts/ ./scripts/
 
-# Expose port
-EXPOSE 9001
+# Expose ports (API + Dashboard)
+EXPOSE 9001 8501
 
-# Run the application
-CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "9001"]
+# Run both API and Dashboard
+CMD ["bash", "scripts/start.sh"]
