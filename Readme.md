@@ -35,7 +35,7 @@ A production-grade system that **proactively detects delivery delays** and **aut
 
 ```bash
 # Clone repository
-git clone https://github.com/your-org/ProactiveLogisticsAgent.git
+git clone https://github.com/faizan30/ProactiveLogisticsAgent
 cd ProactiveLogisticsAgent
 
 # Configure environment
