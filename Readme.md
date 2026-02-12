@@ -1,6 +1,6 @@
 # Proactive Logistics Agent
 
-**Celonis Garage Technical Challenge - AI-Driven Operational Automation**
+**AI-Driven Operational Automation for E-Commerce Logistics**
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109+-green.svg)](https://fastapi.tiangolo.com/)
@@ -307,7 +307,7 @@ done
 OPENAI_API_KEY=sk-...
 
 # Database (defaults for docker-compose)
-POSTGRES_USER=celonis
+POSTGRES_USER=admin
 POSTGRES_PASSWORD=garage
 POSTGRES_HOST=localhost
 POSTGRES_PORT=5432
@@ -356,7 +356,7 @@ pip install -r requirements.txt
 # 3. Start PostgreSQL (separate terminal)
 docker run -d \
   --name postgres-dev \
-  -e POSTGRES_USER=celonis \
+  -e POSTGRES_USER=admin \
   -e POSTGRES_PASSWORD=garage \
   -e POSTGRES_DB=logistics \
   -p 5432:5432 \
@@ -378,7 +378,7 @@ pytest tests/ -v
 ```
 ProactiveLogisticsAgent/
 ├── data/                                    # Datasets and precomputed stats
-│   ├── Celonis_Garage_Enriched_Data_Final.csv  # LLM-enriched dataset (28 cols)
+│   ├── Enriched_Data_Final.csv                    # LLM-enriched dataset (28 cols)
 │   ├── Original_data.csv                        # Kaggle source (12 cols)
 │   ├── route_stats.json                         # 75 route profiles
 │   ├── customer_stats.json                      # Behavior patterns
@@ -624,7 +624,7 @@ This is rare with structured outputs. If it occurs:
 
 ## Acknowledgments
 
-**Challenge:** Celonis Garage Technical Challenge  
+**Project:** Proactive Logistics Agent  
 **Framework:** LangGraph by LangChain  
 **Dataset:** Kaggle Customer Analytics Dataset (enriched)  
 **LLM:** OpenAI GPT-5.x

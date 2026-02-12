@@ -1,5 +1,5 @@
 """
-Configuration for the Celonis Garage demo.
+Configuration for the Proactive Logistics Agent demo.
 """
 import os
 from dotenv import load_dotenv

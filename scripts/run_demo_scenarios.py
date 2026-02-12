@@ -245,7 +245,7 @@ def run_scenario(order_id: int, skip_agent: bool = False) -> dict:
 def main():
     global API_URL
     
-    parser = argparse.ArgumentParser(description="6-Step Demo Flow for Celonis Garage Challenge")
+    parser = argparse.ArgumentParser(description="6-Step Demo Flow for Proactive Logistics Agent")
     parser.add_argument("--scenario", type=int, help="Run specific scenario (1001-1004)")
     parser.add_argument("--all", action="store_true", help="Run all 4 scenarios")
     parser.add_argument("--bootstrap", action="store_true", help="Step 1: Bootstrap demo data")
@@ -256,7 +256,7 @@ def main():
     API_URL = args.url
     
     print("=" * 65)
-    print("CELONIS GARAGE - PROACTIVE LOGISTICS AGENT DEMO")
+    print("PROACTIVE LOGISTICS AGENT DEMO")
     print("=" * 65)
     print(f"\nAPI: {API_URL}")
     

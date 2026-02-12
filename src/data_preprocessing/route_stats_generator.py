@@ -13,7 +13,7 @@ from typing import Dict
 import pandas as pd
 
 
-DEFAULT_CSV_PATH = Path(__file__).resolve().parents[2] / "data" / "Celonis_Garage_Enriched_Data_Final.csv"
+DEFAULT_CSV_PATH = Path(__file__).resolve().parents[2] / "data" / "Enriched_Data_Final.csv"
 DEFAULT_JSON_PATH = Path(__file__).resolve().parents[2] / "data" / "route_stats.json"
 
 

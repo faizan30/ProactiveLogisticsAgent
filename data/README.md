@@ -7,7 +7,7 @@ Datasets for the Proactive Logistics Agent - demonstrating LLM-driven data enric
 | File | Purpose | Source |
 |------|---------|--------|
 | `Original_data.csv` | Kaggle customer analytics dataset | [Kaggle Dataset](https://www.kaggle.com/) |
-| `Celonis_Garage_Enriched_Data_Final.csv` | Enriched with 16 synthetic logistics columns | Gemini Pro LLM |
+| `Enriched_Data_Final.csv` | Enriched with 16 synthetic logistics columns | Gemini Pro LLM |
 | `route_stats.json` | Route performance statistics (75 routes) | Generated from enriched CSV |
 | `customer_stats.json` | Customer behavior by rating (1-5) | Generated from enriched CSV |
 | `policy.md` | Company resolution policies | Handcrafted for demo |
@@ -238,4 +238,4 @@ python -m src.data_preprocessing.route_stats_generator --update
 python -m src.data_preprocessing.customer_stats_generator
 ```
 
-Both read from `Celonis_Garage_Enriched_Data_Final.csv`.
+Both read from `Enriched_Data_Final.csv`.

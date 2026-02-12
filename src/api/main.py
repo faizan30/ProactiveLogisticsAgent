@@ -1,5 +1,5 @@
 """
-Celonis Garage - Proactive Logistics Agent API
+Proactive Logistics Agent API
 
 Simplified API for the demo flow:
   1. POST /bootstrap           - Seed demo data
@@ -27,7 +27,7 @@ from src.bootstrap import bootstrap, SCENARIOS
 DATA_DIR = FilePath(__file__).resolve().parents[2] / "data"
 ROUTE_STATS_FILE = DATA_DIR / "route_stats.json"
 CUSTOMER_STATS_FILE = DATA_DIR / "customer_stats.json"
-ENRICHED_CSV = DATA_DIR / "Celonis_Garage_Enriched_Data_Final.csv"
+ENRICHED_CSV = DATA_DIR / "Enriched_Data_Final.csv"
 
 
 def ensure_stats_exist():
@@ -75,7 +75,7 @@ app_state = AppState()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize DB, RiskEngine, and validate agent on startup."""
-    print("🚀 Starting Celonis Garage API...")
+    print("🚀 Starting Proactive Logistics API...")
     
     # 1. Ensure stats files exist (generate if missing)
     generated = ensure_stats_exist()
@@ -111,7 +111,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Celonis Garage Logistics Agent",
+    title="Proactive Logistics Agent",
     description="Proactive risk detection and resolution for e-commerce logistics",
     version="3.0.0",
     lifespan=lifespan,

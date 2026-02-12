@@ -3,7 +3,7 @@ version: '3.8'
 services:
   web:
     build: .
-    container_name: celonis_garage_agent
+    container_name: logistics_agent
     ports:
       - "9001:9001"
       - "8501:8501"
@@ -16,9 +16,9 @@ services:
 
   db:
     image: postgres:15-alpine
-    container_name: celonis_garage_db
+    container_name: logistics_db
     environment:
-      - POSTGRES_USER=celonis
+      - POSTGRES_USER=admin
       - POSTGRES_PASSWORD=garage
       - POSTGRES_DB=logistics
     ports:

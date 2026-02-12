@@ -13,7 +13,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy only runtime-required files
 COPY src/ ./src/
-COPY data/Celonis_Garage_Enriched_Data_Final.csv ./data/
+COPY data/Enriched_Data_Final.csv ./data/
 COPY data/route_stats.json ./data/
 COPY scripts/ ./scripts/
 

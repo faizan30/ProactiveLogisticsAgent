@@ -1,6 +1,6 @@
 # Proactive Logistics Agent - Architecture Documentation
 
-**Project:** Celonis Garage Technical Challenge  
+**Project:** Proactive Logistics Agent  
 **Version:** 3.0  
 **Last Updated:** February 2026
 
@@ -30,7 +30,7 @@ Reactive customer service is a cost center that erodes brand value. When custome
 
 ### System Goals
 
-This architecture demonstrates four core capabilities aligned with Celonis Garage innovation principles:
+This architecture demonstrates four core capabilities:
 
 **1. Process KPI Monitoring**
 - Real-time calculation of logistics health indicators (hub dwell time, transit velocity, SLA pressure)
@@ -287,4 +287,4 @@ This architecture delivers **proactive logistics automation** through AI-driven 
 
 ---
 
-*Celonis Garage Technical Challenge*
+*Proactive Logistics Agent*

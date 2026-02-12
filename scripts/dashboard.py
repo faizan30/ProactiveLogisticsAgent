@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Streamlit Dashboard for Celonis Garage Proactive Logistics Agent.
+Streamlit Dashboard for Proactive Logistics Agent.
 
 Usage:
     streamlit run scripts/dashboard.py
